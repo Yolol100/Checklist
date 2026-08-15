@@ -1,101 +1,114 @@
 ---
 name: checklist-runner-adapter
-description: Start the Yolol100/Checklist GitHub Actions evidence runner for public read-only website QA after the installed website-qa-checklist Skill has loaded the live Project Checklist manifest and required Google Drive sources. Use this only as a capability adapter; it never owns QA policy, priority, status mapping or release decisions.
+description: Start the registered Yolol100/Checklist GitHub Actions evidence runner for public read-only Project Checklist QA after website-qa-checklist has loaded the live manifest and required Drive sources, then finalize the source-bound policy evaluation into Evidence Manifest 3.0. Use only as a capability adapter; it never owns QA policy, priority, status mapping or release decisions.
 ---
 
 # Checklist Runner Adapter
 
 ## Ownership
 
-- `webactueel-workflow` remains controller when the assignment is coordinated/managed.
-- `website-qa-checklist` remains the QA owner.
+- `webactueel-workflow` remains controller for coordinated/managed work.
+- `website-qa-checklist` remains QA owner and is the only layer that interprets observations into canonical status, severity, priority and release advice.
 - Registered Google Drive Project Checklist sources remain project truth.
-- `Yolol100/Checklist` is only the remote execution/evidence layer.
+- `Yolol100/Checklist` is remote execution, evidence persistence and deterministic manifest transformation only.
 
-## Mandatory source-first order
+## Phase 1 — source-first raw evidence
 
 Before writing `requests/current.json`:
 
-1. Load the installed `website-qa-checklist` Skill.
-2. Read the live `PROJECT-MANIFEST.json.md` from the registered Project Checklist Drive root and capture `source_set_version` plus canonical manifest SHA-256.
+1. Load `website-qa-checklist`.
+2. Read the live Project Checklist manifest and capture `source_set_version` plus canonical manifest SHA-256.
 3. Read at minimum:
    - `active/00-project-index-en-router.md`
    - `active/01-qa-proces-en-severity.md`
    - `active/11-evidence-levels-runtime-matrix.md`
-   - `support/87-master-project-checklist.md`
    - `support/82-tool-en-browsermatrix.md`
+   - `support/83-evidence-manifest-schema.json`
+   - `support/84-runtime-matrix-schema.json`
+   - `support/87-master-project-checklist.md`
    - `support/88-playwright-axe-adapter.md`
-4. For `release_verification`, also read:
-   - `active/09-release-go-no-go-en-hertest.md`
-   - `active/13-release-scoring-and-claim-gates.md`
-5. Determine scope, level, task type, selection basis, mandatory manual layers and the requested final claim before invoking GitHub.
+4. Read task-relevant domain sources before execution. For `release_verification`, also read `active/09-release-go-no-go-en-hertest.md` and `active/13-release-scoring-and-claim-gates.md`.
+5. Capture the SHA-256 of every selected source from the live manifest/SHA256SUMS.
+6. Determine scope, level, task type, selection basis, mandatory manual layers and requested final claim before GitHub execution.
 
-Do not scan first and invent policy from the output afterward.
+Never scan first and invent policy from output afterward.
 
-## Request contract
+### Request contract
 
-Write a unique request to `requests/current.json` containing:
+Write a unique `requests/current.json` with:
 
-- `request_id`
-- public URL without credentials or query parameters
-- `level`: `quick`, `standard` or `full`
-- `task_type`: `audit`, `live_smoke` or `release_verification`
-- timestamp and requester
-- `source_context.project_id = project-checklist`
-- current `source_set_version`
-- current canonical `manifest_sha256`
-- `selection_basis`
-- exact `selected_sources` already read
+- `request_id`;
+- public URL without credentials/query parameters;
+- `level`: `quick`, `standard` or `full`;
+- `task_type`: `audit`, `live_smoke` or `release_verification`;
+- timestamp/requester;
+- `source_context.project_id = project-checklist`;
+- current `source_set_version` and canonical `manifest_sha256`;
+- `selection_basis`;
+- exact `selected_sources` already read;
+- `source_hashes` for every selected source.
 
-The runner rejects incomplete source preflight. A release request is rejected unless sources `09` and `13` are included.
+The runner fails closed on incomplete source preflight, missing source hashes or missing release sources.
 
-## Execution
+### Raw execution
 
-1. Read the current request through the connected GitHub app.
-2. Replace it with the source-complete request.
-3. The write to `main` triggers `Run Checklist`.
-4. Follow the matching GitHub Actions run until completion; do not claim completion while queued/running.
-5. Read `results/latest.json`.
-6. Accept it only when `request.request_id`, `source_context.source_set_version` and `source_context.manifest_sha256` match the request.
-7. Load additional domain sources named in `observations[].source_refs` only where interpretation requires them.
-8. Apply `website-qa-checklist` to convert raw evidence to the formal Evidence Manifest 3.0 / Runtime Matrix 2.0 and canonical Checklist labels.
-9. Apply release gates only in the Skill/controller, never in repository code.
+1. Write the source-complete request to `main` through the connected GitHub app.
+2. Follow the matching `Run Checklist` workflow to completion.
+3. Read `results/latest.json` and accept it only when request ID, source-set version, manifest SHA and selected source hashes match the preflight.
+4. The same immutable raw run is stored as `results/runs/<request_id>.json`; browser artifacts live under `artifacts/runs/<request_id>/`.
+5. Load additional domain sources in `observations[].source_refs` when interpretation requires them.
 
-## Raw evidence boundary
+`results/latest.json` remains `raw-evidence-v1`; `policy_evaluation` must stay `null`.
 
-`results/latest.json` uses `raw-evidence-v1`. It may contain:
+## Phase 2 — Website QA policy evaluation
 
-- public HTTP/redirect/header observations;
-- SEO and HTML observations;
-- internal-link sampling;
-- Playwright Chromium evidence;
-- desktop and mobile viewport emulation;
-- axe-core accessibility findings;
-- console/page-error and mixed-content evidence;
-- lab navigation timing.
+After raw evidence is accepted:
 
-Treat these as evidence only. Do not let the runner redefine Checklist policy.
+1. Apply `website-qa-checklist` and the already loaded live sources to determine scope-specific findings, owners, severity/status, required runtime layers, in-scope unexecuted tests, rollback/monitoring state and release decision.
+2. Do not hand-build Evidence Manifest 3.0.
+3. Write only `policy/current.json` using `policy-evaluation-v1`, bound to:
+   - latest accepted `request_id`;
+   - `project-checklist`, source-set version and manifest SHA;
+   - current SHA-256 of `support/83-evidence-manifest-schema.json` and `support/84-runtime-matrix-schema.json`;
+   - one or more raw `rounds` by request ID;
+   - scope, required runtime IDs, findings and release decision.
+4. For stable/release task types, provide two distinct completed raw request IDs. Never duplicate one run to simulate two rounds.
+5. The `Finalize Checklist` workflow runs `src/finalize.js`, builds `results/formal-latest.json` deterministically and validates it with `src/validate-formal.js`.
+6. Accept the formal result only when the workflow succeeds and the policy/source bindings still match.
+
+Repository code may validate and transform policy fields but must never choose severity, canonical status or release decision itself.
+
+## Dynamic UI evidence
+
+The Chromium harness uses source `88` boundaries:
+
+- navigate to the intended public state;
+- require a visible `body`;
+- wait for DOM mutation quiescence rather than `networkidle` or blind sleeps;
+- collect a rendered DOM/readiness inventory before axe and before deriving title/H1/form/alt/link observations;
+- use server HTML only as explicit fallback when rendered browser evidence is unavailable;
+- preserve screenshot, DOM inventory, full axe JSON and Playwright trace with hashes.
+
+## Evidence boundaries
+
+- Public HTTP/robots/link observations may support `production_observation` for the live state actually observed.
+- Playwright/axe from GitHub Actions remains `controlled_runtime`.
+- Mobile viewport emulation uses `execution_mode: emulated`.
+- No automatic claim for keyboard, zoom, screenreader, real device, real Safari/iOS, inbox delivery, payment, authenticated flow, formal WCAG conformity or field Core Web Vitals.
 
 ## Safety
 
-- Public read-only observations only.
-- Never submit forms, authenticate, place orders, run payments or change the target website.
-- Reject local/private/reserved targets and unsafe redirects.
-- Automated results do not prove keyboard, zoom, screenreader, real-device, real Safari/iOS, inbox delivery, payment or authenticated-flow behavior.
-- Preserve `Geblokkeerd` or `Te controleren` where the required evidence layer is unavailable.
-- Do not promote GitHub output to project truth; Drive remains authoritative.
-
-## Evidence levels
-
-- Public HTTP/robots/link observations may support `production_observation` for the live state actually observed.
-- Playwright/axe evidence from GitHub Actions stays `controlled_runtime` under the current Checklist source rules.
-- Mobile viewport emulation additionally uses `execution_mode: emulated`.
-- Neither becomes `browser_at`, real-device, true Safari/iOS or assistive-technology evidence without a separate real test layer.
+- Public read-only targets only.
+- Reject private/local/reserved targets, unsafe redirects, credentials and query parameters.
+- Never submit forms, authenticate, place orders, run payments or mutate the target.
+- Repository is public: never write secrets, persoonsgegevens or confidential staging paths into requests/policy.
+- Preserve `Geblokkeerd`/`Te controleren` where required evidence is unavailable.
+- Drive remains authoritative; GitHub results never become project truth.
 
 ## Output
 
-Lead with the Checklist decision. Then state the most important failed/blocked items, what was tested, what remains untested and the highest evidence level. Use the canonical labels from the Website QA Skill.
+Lead with the canonical Website QA decision, then failed/blocked points, tested scope, untested scope and highest evidence layer. For managed work, return completion evidence to `webactueel-workflow`.
 
 ## Failure rule
 
-If source preflight, GitHub write access or GitHub Actions is unavailable, report `Geblokkeerd`/`handoff_required` according to the Website QA sources. Do not fall back to asking the user to create an API key, tunnel, paid QA account or separate hosting account.
+If source preflight, GitHub write access, Actions, raw validation or formal finalization fails, report `Geblokkeerd`/`handoff_required` according to Website QA sources. Do not invent an API-key/tunnel/paid-service fallback.
