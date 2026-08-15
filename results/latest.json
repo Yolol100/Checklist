@@ -1,327 +1,524 @@
 {
+  "schema_version": "raw-evidence-v1",
   "request": {
-    "request_id": "smoke-v0.3-browser-20260815-1426z",
+    "request_id": "fixture-v0.4-source-first",
     "url": "https://example.com/",
     "level": "standard",
-    "requested_at": "2026-08-15T14:26:00Z",
+    "task_type": "audit",
+    "requested_at": "2026-08-15T15:12:00Z",
     "requested_by": "ChatGPT"
   },
-  "schema_version": "0.2",
-  "runner": "webactueel-checklist-qa",
-  "runner_version": "0.3.0",
-  "level": "standard",
+  "source_context": {
+    "project_id": "project-checklist",
+    "source_set_version": "2026-08-14.1-reconnaissance-before-action",
+    "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46",
+    "selection_basis": "Website QA Skill preflight for a standard public read-only audit using the registered GitHub connector and remote GitHub Actions browser runner.",
+    "selected_sources": [
+      "active/00-project-index-en-router.md",
+      "active/01-qa-proces-en-severity.md",
+      "active/02-frontend-responsive-accessibility.md",
+      "active/04-seo-indexatie-en-migratie.md",
+      "active/08-security-en-technische-risicos.md",
+      "active/11-evidence-levels-runtime-matrix.md",
+      "support/82-tool-en-browsermatrix.md",
+      "support/87-master-project-checklist.md",
+      "support/88-playwright-axe-adapter.md"
+    ]
+  },
+  "runner": {
+    "name": "webactueel-checklist-qa",
+    "version": "0.4.0",
+    "contract": "raw-evidence-v1",
+    "mutation_performed": false
+  },
   "target": "https://example.com/",
   "final_url": "https://example.com/",
-  "started_at": "2026-08-15T14:26:19.575Z",
-  "completed_at": "2026-08-15T14:26:21.274Z",
-  "evidence_level": "production_observation",
-  "runtime": {
+  "started_at": "2026-08-15T15:20:31.309Z",
+  "completed_at": "2026-08-15T15:20:33.326Z",
+  "configuration_hash": "c5092da6d3463058543cf4b682d842a25ab35a3a76c6ce1c1c902c751f333342",
+  "tool_versions": {
+    "playwright": "1.62.0",
+    "axe_core": "4.12.1"
+  },
+  "runtime_observation": {
     "host": "github-actions",
     "public_read_only": true,
+    "network_target": "public-production-url",
+    "browser_harness": true,
     "browser_evidence": {
       "playwright": "1.62.0",
       "axe_core": "4.12.1"
+    },
+    "browser_configuration": {
+      "locale": "nl-NL",
+      "timezoneId": "Europe/Amsterdam",
+      "reducedMotion": "reduce",
+      "waitUntil": "domcontentloaded",
+      "navigationTimeoutMs": 25000,
+      "loadTimeoutMs": 7000
     }
   },
-  "mutation_performed": false,
-  "decision": "Go na fixes",
-  "decision_scope": "Runneradvies op uitgevoerde evidence; de website-qa-checklist Skill en actieve Drive-bronnen bepalen de uiteindelijke QA/releaseclaim.",
-  "summary": {
-    "passed": 16,
-    "failed": 7,
-    "blocked": 2,
-    "to_check": 1,
-    "not_applicable": 1
-  },
-  "findings": [
+  "evidence_registry": [
+    {
+      "id": "EV-HTTP-MAIN",
+      "type": "response",
+      "source": "runtime:main-http-response",
+      "created_at": "2026-08-15T15:20:33.326Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/",
+      "evidence_level": "production_observation",
+      "execution_mode": "synthetic",
+      "sha256": null
+    },
+    {
+      "id": "EV-LINK-SAMPLE",
+      "type": "report",
+      "source": "runtime:internal-link-sample",
+      "created_at": "2026-08-15T15:20:33.326Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/",
+      "evidence_level": "production_observation",
+      "execution_mode": "synthetic",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "id": "EV-ROBOTS",
+      "type": "response",
+      "source": "runtime:robots.txt",
+      "created_at": "2026-08-15T15:20:33.326Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/robots.txt",
+      "evidence_level": "production_observation",
+      "execution_mode": "synthetic",
+      "sha256": "e5dca624fdc371659aeaecdb0ddc54a6c3ad28057d541b145d2a8802a8789bac"
+    },
+    {
+      "id": "EV-BROWSER-DESKTOP",
+      "type": "report",
+      "source": "runtime:chromium-desktop",
+      "created_at": "2026-08-15T15:20:33.326Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "synthetic",
+      "sha256": "cbff7d9c7aab0599de69847e3b97c4a09e0642fc1a217459df4e43d80224034c",
+      "artifacts": [
+        "browser/desktop/page.png",
+        "browser/desktop/trace.zip"
+      ]
+    },
+    {
+      "id": "EV-AXE-DESKTOP",
+      "type": "report",
+      "source": "browser/desktop/axe.json",
+      "created_at": "2026-08-15T15:20:32.814Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/ (desktop)",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "synthetic",
+      "sha256": "f5f70a289e82b01c637bc311ba843d6253ceef021c2ca48c009edcf07fe7fe59"
+    },
+    {
+      "id": "EV-FILE-BROWSER-DESKTOP-PAGE-PNG",
+      "type": "screenshot",
+      "source": "browser/desktop/page.png",
+      "created_at": "2026-08-15T15:20:32.813Z",
+      "environment": "github-actions",
+      "scope": "desktop full-page screenshot",
+      "sha256": "b0250fbbe6cb5b9233ce8c3d2002e409d42cd0ab58ae453068063ad8b30156c1",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "synthetic"
+    },
+    {
+      "id": "EV-FILE-BROWSER-DESKTOP-AXE-JSON",
+      "type": "report",
+      "source": "browser/desktop/axe.json",
+      "created_at": "2026-08-15T15:20:32.814Z",
+      "environment": "github-actions",
+      "scope": "desktop volledige axe JSON",
+      "sha256": "f5f70a289e82b01c637bc311ba843d6253ceef021c2ca48c009edcf07fe7fe59",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "synthetic"
+    },
+    {
+      "id": "EV-FILE-BROWSER-DESKTOP-TRACE-ZIP",
+      "type": "trace",
+      "source": "browser/desktop/trace.zip",
+      "created_at": "2026-08-15T15:20:32.862Z",
+      "environment": "github-actions",
+      "scope": "desktop Playwright trace",
+      "sha256": "fdd9159e978f6ef5102a71c9715d9e8ba5db114f810fb7736cf219d00b24deb4",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "synthetic"
+    },
+    {
+      "id": "EV-BROWSER-MOBILE",
+      "type": "report",
+      "source": "runtime:chromium-mobile",
+      "created_at": "2026-08-15T15:20:33.326Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "emulated",
+      "sha256": "395f30049d7f53b5dd451424432205050945a9c29e1db6a1c6f97a85030df0ab",
+      "artifacts": [
+        "browser/mobile/page.png",
+        "browser/mobile/trace.zip"
+      ]
+    },
+    {
+      "id": "EV-AXE-MOBILE",
+      "type": "report",
+      "source": "browser/mobile/axe.json",
+      "created_at": "2026-08-15T15:20:33.254Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/ (mobile)",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "emulated",
+      "sha256": "b49c7f1d2e9556f590c5e5bdefe4349f46a9068b51477ef975f134bd519a9737"
+    },
+    {
+      "id": "EV-FILE-BROWSER-MOBILE-PAGE-PNG",
+      "type": "screenshot",
+      "source": "browser/mobile/page.png",
+      "created_at": "2026-08-15T15:20:33.253Z",
+      "environment": "github-actions",
+      "scope": "mobile full-page screenshot",
+      "sha256": "79aced1cf245c456caa0dcfe73cf43f71d5790fb09693f626b827f35ea201770",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "emulated"
+    },
+    {
+      "id": "EV-FILE-BROWSER-MOBILE-AXE-JSON",
+      "type": "report",
+      "source": "browser/mobile/axe.json",
+      "created_at": "2026-08-15T15:20:33.254Z",
+      "environment": "github-actions",
+      "scope": "mobile volledige axe JSON",
+      "sha256": "b49c7f1d2e9556f590c5e5bdefe4349f46a9068b51477ef975f134bd519a9737",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "emulated"
+    },
+    {
+      "id": "EV-FILE-BROWSER-MOBILE-TRACE-ZIP",
+      "type": "trace",
+      "source": "browser/mobile/trace.zip",
+      "created_at": "2026-08-15T15:20:33.293Z",
+      "environment": "github-actions",
+      "scope": "mobile Playwright trace",
+      "sha256": "2e00dae53eaec1165bd9aa2a5bb4efd5de940e11967f7fd25ad1898ae092c615",
+      "evidence_level": "controlled_runtime",
+      "execution_mode": "emulated"
+    }
+  ],
+  "observations": [
     {
       "id": "HTTP-001",
       "category": "bereikbaarheid",
-      "title": "Publieke pagina is bereikbaar",
-      "status": "Geslaagd",
-      "priority": "Hoog",
-      "confidence": "Bevestigd",
+      "title": "Publieke pagina bereikbaar",
+      "outcome": "observed_ok",
       "source_refs": [
-        "01-qa-proces-en-severity.md",
-        "11-evidence-levels-runtime-matrix.md"
+        "active/01-qa-proces-en-severity.md",
+        "active/11-evidence-levels-runtime-matrix.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "requested_url": "https://example.com/",
         "final_url": "https://example.com/",
         "status_code": 200,
         "redirect_chain": []
       },
-      "recommendation": "Geen actie."
+      "note": null
     },
     {
       "id": "HTTP-HTML",
       "category": "bereikbaarheid",
       "title": "Response is HTML",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "outcome": "observed_ok",
       "source_refs": [
-        "01-qa-proces-en-severity.md",
-        "11-evidence-levels-runtime-matrix.md"
+        "active/01-qa-proces-en-severity.md",
+        "active/11-evidence-levels-runtime-matrix.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "content_type": "text/html"
       },
-      "recommendation": "Geen actie."
+      "note": null
     },
     {
       "id": "TLS-001",
       "category": "security",
       "title": "Eind-URL gebruikt HTTPS",
-      "status": "Geslaagd",
-      "priority": "Hoog",
-      "confidence": "Bevestigd",
+      "outcome": "observed_ok",
       "source_refs": [
-        "08-security-en-technische-risicos.md"
+        "active/08-security-en-technische-risicos.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "final_url": "https://example.com/"
       },
-      "recommendation": "Geen actie."
+      "note": null
     },
     {
       "id": "HDR-STRICT-TRANSPORT-SECURITY",
       "category": "security",
-      "title": "HSTS aanwezig",
-      "status": "Mislukt",
-      "priority": "Hoog",
-      "confidence": "Bevestigd",
+      "title": "HSTS aanwezigheid",
+      "outcome": "observed_issue",
       "source_refs": [
-        "08-security-en-technische-risicos.md"
+        "active/08-security-en-technische-risicos.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "header": "strict-transport-security",
         "value": null
       },
-      "recommendation": "Beoordeel en configureer HSTS passend voor de site."
+      "note": "De runner observeert alleen aanwezigheid; de Skill/bronnen beoordelen vereiste beleidswaarde en ernst."
     },
     {
       "id": "HDR-CONTENT-SECURITY-POLICY",
       "category": "security",
-      "title": "Content-Security-Policy aanwezig",
-      "status": "Mislukt",
-      "priority": "Midden",
-      "confidence": "Bevestigd",
+      "title": "Content-Security-Policy aanwezigheid",
+      "outcome": "observed_issue",
       "source_refs": [
-        "08-security-en-technische-risicos.md"
+        "active/08-security-en-technische-risicos.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "header": "content-security-policy",
         "value": null
       },
-      "recommendation": "Beoordeel en configureer Content-Security-Policy passend voor de site."
+      "note": "De runner observeert alleen aanwezigheid; de Skill/bronnen beoordelen vereiste beleidswaarde en ernst."
     },
     {
       "id": "HDR-X-CONTENT-TYPE-OPTIONS",
       "category": "security",
-      "title": "X-Content-Type-Options aanwezig",
-      "status": "Mislukt",
-      "priority": "Midden",
-      "confidence": "Bevestigd",
+      "title": "X-Content-Type-Options aanwezigheid",
+      "outcome": "observed_issue",
       "source_refs": [
-        "08-security-en-technische-risicos.md"
+        "active/08-security-en-technische-risicos.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "header": "x-content-type-options",
         "value": null
       },
-      "recommendation": "Beoordeel en configureer X-Content-Type-Options passend voor de site."
+      "note": "De runner observeert alleen aanwezigheid; de Skill/bronnen beoordelen vereiste beleidswaarde en ernst."
     },
     {
       "id": "HDR-REFERRER-POLICY",
       "category": "security",
-      "title": "Referrer-Policy aanwezig",
-      "status": "Mislukt",
-      "priority": "Midden",
-      "confidence": "Bevestigd",
+      "title": "Referrer-Policy aanwezigheid",
+      "outcome": "observed_issue",
       "source_refs": [
-        "08-security-en-technische-risicos.md"
+        "active/08-security-en-technische-risicos.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "header": "referrer-policy",
         "value": null
       },
-      "recommendation": "Beoordeel en configureer Referrer-Policy passend voor de site."
+      "note": "De runner observeert alleen aanwezigheid; de Skill/bronnen beoordelen vereiste beleidswaarde en ernst."
     },
     {
       "id": "HDR-PERMISSIONS-POLICY",
       "category": "security",
-      "title": "Permissions-Policy aanwezig",
-      "status": "Mislukt",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "Permissions-Policy aanwezigheid",
+      "outcome": "observed_issue",
       "source_refs": [
-        "08-security-en-technische-risicos.md"
+        "active/08-security-en-technische-risicos.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "header": "permissions-policy",
         "value": null
       },
-      "recommendation": "Beoordeel en configureer Permissions-Policy passend voor de site."
+      "note": "De runner observeert alleen aanwezigheid; de Skill/bronnen beoordelen vereiste beleidswaarde en ernst."
     },
     {
       "id": "SEO-001",
       "category": "seo",
-      "title": "HTML-title aanwezig",
-      "status": "Geslaagd",
-      "priority": "Hoog",
-      "confidence": "Bevestigd",
+      "title": "HTML-title aanwezigheid",
+      "outcome": "observed_ok",
       "source_refs": [
-        "04-seo-indexatie-en-migratie.md"
+        "active/04-seo-indexatie-en-migratie.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "title": "Example Domain",
         "length": 14
       },
-      "recommendation": "Controleer inhoud en zoekintentie in de SEO-skill."
+      "note": null
     },
     {
       "id": "SEO-002",
       "category": "seo",
-      "title": "Meta description aanwezig",
-      "status": "Mislukt",
-      "priority": "Midden",
-      "confidence": "Bevestigd",
+      "title": "Meta description aanwezigheid",
+      "outcome": "observed_issue",
       "source_refs": [
-        "04-seo-indexatie-en-migratie.md"
+        "active/04-seo-indexatie-en-migratie.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "description": null,
         "length": 0
       },
-      "recommendation": "Voeg een relevante meta description toe."
+      "note": null
     },
     {
       "id": "SEO-INDEX-001",
       "category": "seo",
-      "title": "Geen expliciete meta noindex gevonden",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "Meta robots/noindex observatie",
+      "outcome": "observed_ok",
       "source_refs": [
-        "04-seo-indexatie-en-migratie.md"
+        "active/04-seo-indexatie-en-migratie.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "robots_meta": null,
         "noindex": false
       },
-      "recommendation": "Controleer indexeerbaarheid verder via robots, headers en Search Console wanneer relevant."
+      "note": null
     },
     {
       "id": "SEO-CANONICAL",
       "category": "seo",
-      "title": "Canonical-link aanwezig",
-      "status": "Te controleren",
-      "priority": "Midden",
-      "confidence": "Handmatig testen nodig",
+      "title": "Canonical-link observatie",
+      "outcome": "needs_interpretation",
       "source_refs": [
-        "04-seo-indexatie-en-migratie.md"
+        "active/04-seo-indexatie-en-migratie.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "canonical": null
       },
-      "recommendation": "Beoordeel of deze pagina een canonical-link nodig heeft."
+      "note": "Afwezigheid is niet automatisch een fout; de SEO-bron bepaalt de verwachting voor deze URL."
     },
     {
       "id": "HTML-001",
       "category": "frontend",
-      "title": "Pagina bevat een H1",
-      "status": "Geslaagd",
-      "priority": "Midden",
-      "confidence": "Bevestigd",
+      "title": "H1-aanwezigheid",
+      "outcome": "observed_ok",
       "source_refs": [
-        "02-frontend-responsive-accessibility.md"
+        "active/02-frontend-responsive-accessibility.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "h1_count": 1
       },
-      "recommendation": "Controleer semantiek en inhoud handmatig."
+      "note": null
     },
     {
       "id": "A11Y-001",
       "category": "accessibility",
-      "title": "Afbeeldingen hebben een alt-attribuut",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "Afbeeldingen met alt-attribuut",
+      "outcome": "observed_ok",
       "source_refs": [
-        "02-frontend-responsive-accessibility.md",
-        "88-playwright-axe-adapter.md"
+        "active/02-frontend-responsive-accessibility.md",
+        "support/88-playwright-axe-adapter.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "image_count": 0,
         "missing_alt_attribute_count": 0
       },
-      "recommendation": "Beoordeel de alt-teksten inhoudelijk; lege alt kan correct zijn."
+      "note": "Aanwezigheid zegt niets over de inhoudelijke juistheid van alt-tekst."
     },
     {
       "id": "FORM-001",
       "category": "forms",
-      "title": "Formulieren functioneel getest",
-      "status": "Niet van toepassing",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "Formulierflow functioneel uitgevoerd",
+      "outcome": "not_applicable",
       "source_refs": [
-        "03-formulieren-email-en-crm.md"
+        "active/03-formulieren-email-en-crm.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-HTTP-MAIN"
+      ],
+      "data": {
         "form_count": 0,
         "submitted": false
       },
-      "recommendation": "Geen formulier op deze pagina gevonden."
+      "note": "De runner verstuurt nooit formulieren."
     },
     {
       "id": "LINK-001",
       "category": "links",
-      "title": "Interne linksteekproef geeft geen HTTP-fout",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "Interne linksteekproef",
+      "outcome": "observed_ok",
       "source_refs": [
-        "04-seo-indexatie-en-migratie.md"
+        "active/04-seo-indexatie-en-migratie.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-LINK-SAMPLE"
+      ],
+      "data": {
         "tested_count": 0,
         "broken_count": 0,
         "broken": []
       },
-      "recommendation": "Vergroot de crawl wanneer de scope een volledige site-audit vereist."
+      "note": null
     },
     {
       "id": "SEO-ROBOTS",
       "category": "seo",
-      "title": "robots.txt geobserveerd",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "robots.txt observatie",
+      "outcome": "observed_ok",
       "source_refs": [
-        "04-seo-indexatie-en-migratie.md"
+        "active/04-seo-indexatie-en-migratie.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-ROBOTS"
+      ],
+      "data": {
         "url": "https://example.com/robots.txt",
         "status_code": 404,
         "sitemap_directives": [],
         "blocks_all": false
       },
-      "recommendation": "Gebruik dit als observatie; 404 is niet automatisch een SEO-fout."
+      "note": null
     },
     {
       "id": "RUNTIME-BROWSER",
       "category": "runtime",
       "title": "Chromium browserharness uitgevoerd",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "outcome": "observed_ok",
       "source_refs": [
-        "11-evidence-levels-runtime-matrix.md",
-        "82-tool-en-browsermatrix.md"
+        "active/11-evidence-levels-runtime-matrix.md",
+        "support/82-tool-en-browsermatrix.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-BROWSER-DESKTOP",
+        "EV-BROWSER-MOBILE"
+      ],
+      "data": {
         "browser": "chromium",
         "tool_versions": {
           "playwright": "1.62.0",
@@ -330,22 +527,25 @@
         "viewports": [
           "desktop",
           "mobile"
-        ]
+        ],
+        "execution_note": "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology."
       },
-      "recommendation": "Gebruik deze evidence als browserharness-bewijs; niet als bewijs voor echte Safari/iOS of assistive technology."
+      "note": null
     },
     {
       "id": "A11Y-AUTO",
       "category": "accessibility",
-      "title": "Geautomatiseerde axe-controle",
-      "status": "Mislukt",
-      "priority": "Midden",
-      "confidence": "Bevestigd",
+      "title": "Geautomatiseerde axe-observatie",
+      "outcome": "observed_issue",
       "source_refs": [
-        "02-frontend-responsive-accessibility.md",
-        "88-playwright-axe-adapter.md"
+        "active/02-frontend-responsive-accessibility.md",
+        "support/88-playwright-axe-adapter.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-AXE-DESKTOP",
+        "EV-AXE-MOBILE"
+      ],
+      "data": {
         "violation_count": 4,
         "serious_or_critical_count": 0,
         "by_viewport": [
@@ -355,6 +555,7 @@
             "serious_or_critical_count": 0,
             "passes": 13,
             "incomplete": 0,
+            "inapplicable": 75,
             "violations": [
               {
                 "id": "landmark-one-main",
@@ -388,6 +589,7 @@
             "serious_or_critical_count": 0,
             "passes": 13,
             "incomplete": 0,
+            "inapplicable": 75,
             "violations": [
               {
                 "id": "landmark-one-main",
@@ -417,50 +619,54 @@
           }
         ]
       },
-      "recommendation": "Laat de accessibility/frontend-eigenaar de bevestigde axe-bevindingen beoordelen en hertest daarna."
+      "note": "Automatische axe-resultaten zijn aanvullend bewijs en geen formele WCAG-conformiteitsclaim."
     },
     {
       "id": "HTML-LANG",
       "category": "accessibility",
-      "title": "HTML-taal is ingesteld",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "HTML-taalattribuut geobserveerd",
+      "outcome": "observed_ok",
       "source_refs": [
-        "02-frontend-responsive-accessibility.md",
-        "88-playwright-axe-adapter.md"
+        "active/02-frontend-responsive-accessibility.md",
+        "support/88-playwright-axe-adapter.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-BROWSER-DESKTOP"
+      ],
+      "data": {
         "lang": "en"
       },
-      "recommendation": "Controleer of de taalwaarde inhoudelijk klopt."
+      "note": null
     },
     {
       "id": "RESP-001",
       "category": "frontend",
-      "title": "Viewport-meta aanwezig",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "Viewport-meta geobserveerd",
+      "outcome": "observed_ok",
       "source_refs": [
-        "02-frontend-responsive-accessibility.md"
+        "active/02-frontend-responsive-accessibility.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-BROWSER-DESKTOP"
+      ],
+      "data": {
         "viewport_meta": "width=device-width, initial-scale=1"
       },
-      "recommendation": "Geen actie voor aanwezigheid; beoordeel responsive gedrag apart."
+      "note": null
     },
     {
       "id": "JS-001",
       "category": "frontend",
-      "title": "Geen browserconsole- of page-errors in de testload",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "Browserconsole- en page-errors in testload",
+      "outcome": "observed_ok",
       "source_refs": [
-        "02-frontend-responsive-accessibility.md"
+        "active/02-frontend-responsive-accessibility.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-BROWSER-DESKTOP",
+        "EV-BROWSER-MOBILE"
+      ],
+      "data": {
         "by_viewport": [
           {
             "viewport": "desktop",
@@ -474,43 +680,47 @@
           }
         ]
       },
-      "recommendation": "Geen actie voor deze run."
+      "note": null
     },
     {
       "id": "TLS-MIXED-CONTENT",
       "category": "security",
-      "title": "Geen onversleutelde HTTP-subrequests op HTTPS-pagina",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "HTTP-subrequests op HTTPS-pagina",
+      "outcome": "observed_ok",
       "source_refs": [
-        "08-security-en-technische-risicos.md"
+        "active/08-security-en-technische-risicos.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-BROWSER-DESKTOP",
+        "EV-BROWSER-MOBILE"
+      ],
+      "data": {
         "count": 0,
         "urls": []
       },
-      "recommendation": "Geen actie voor deze browserrun."
+      "note": null
     },
     {
       "id": "PERF-LAB-OBS",
       "category": "performance",
-      "title": "Browserlab-timing verzameld",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "Synthetische browser-navigation timing",
+      "outcome": "observed_ok",
       "source_refs": [
-        "06-wordpress-elementor-en-performance.md",
-        "82-tool-en-browsermatrix.md"
+        "active/06-wordpress-elementor-en-performance.md",
+        "support/82-tool-en-browsermatrix.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-BROWSER-DESKTOP",
+        "EV-BROWSER-MOBILE"
+      ],
+      "data": {
         "by_viewport": [
           {
             "viewport": "desktop",
             "navigation_timing": {
-              "ttfb_ms": 11,
-              "dom_content_loaded_ms": 64,
-              "load_ms": 65,
+              "ttfb_ms": 10,
+              "dom_content_loaded_ms": 60,
+              "load_ms": 61,
               "transfer_size": 618,
               "encoded_body_size": 318
             }
@@ -518,8 +728,8 @@
           {
             "viewport": "mobile",
             "navigation_timing": {
-              "ttfb_ms": 10,
-              "dom_content_loaded_ms": 37,
+              "ttfb_ms": 13,
+              "dom_content_loaded_ms": 36,
               "load_ms": 37,
               "transfer_size": 618,
               "encoded_body_size": 318
@@ -527,67 +737,94 @@
           }
         ]
       },
-      "recommendation": "Gebruik deze timings alleen diagnostisch; beoordeel echte Core Web Vitals met geschikte velddata wanneer vereist."
+      "note": "Diagnostisch labbewijs; geen echte Core Web Vitals-velddata."
     },
     {
       "id": "RUNTIME-MOBILE-EMU",
       "category": "runtime",
-      "title": "Mobiele browseremulatie uitgevoerd",
-      "status": "Geslaagd",
-      "priority": "Laag",
-      "confidence": "Bevestigd",
+      "title": "Mobiele viewportemulatie uitgevoerd",
+      "outcome": "observed_ok",
       "source_refs": [
-        "11-evidence-levels-runtime-matrix.md",
-        "82-tool-en-browsermatrix.md"
+        "active/11-evidence-levels-runtime-matrix.md",
+        "support/82-tool-en-browsermatrix.md"
       ],
-      "evidence": {
+      "evidence_ids": [
+        "EV-BROWSER-MOBILE"
+      ],
+      "data": {
         "viewport": {
           "width": 390,
           "height": 844
         },
         "emulation": true
       },
-      "recommendation": "Gebruik dit voor layout/clientgedrag, niet als echt-devicebewijs."
+      "note": "Emulatie bewijst geen echte iPhone, Safari/iOS, touchhardware of mobiele browserchrome."
     },
     {
       "id": "A11Y-MANUAL",
       "category": "accessibility",
-      "title": "Keyboard, zoom en screenreader getest",
-      "status": "Geblokkeerd",
-      "priority": "Hoog",
-      "confidence": "Handmatig testen nodig",
+      "title": "Keyboard, zoom en screenreader",
+      "outcome": "not_executed",
       "source_refs": [
-        "02-frontend-responsive-accessibility.md",
-        "88-playwright-axe-adapter.md"
+        "active/02-frontend-responsive-accessibility.md",
+        "support/88-playwright-axe-adapter.md"
       ],
-      "evidence": {
+      "evidence_ids": [],
+      "data": {
         "automated_runner_can_prove": false
       },
-      "recommendation": "Voer keyboard-, zoom- en passende screenreadertests uit op een echte browser/AT-combinatie."
+      "note": "Vereist aparte echte browser/input/AT-evidence wanneer de QA-bronnen dit voor de scope verplicht stellen."
     },
     {
       "id": "RUNTIME-REAL-DEVICE",
       "category": "runtime",
-      "title": "Echt mobiel apparaat / echte Safari-iOS gecontroleerd",
-      "status": "Geblokkeerd",
-      "priority": "Midden",
-      "confidence": "Handmatig testen nodig",
+      "title": "Echt mobiel apparaat / echte Safari-iOS",
+      "outcome": "not_executed",
       "source_refs": [
-        "11-evidence-levels-runtime-matrix.md",
-        "82-tool-en-browsermatrix.md"
+        "active/11-evidence-levels-runtime-matrix.md",
+        "support/82-tool-en-browsermatrix.md"
       ],
-      "evidence": {
+      "evidence_ids": [],
+      "data": {
         "automated_runner_can_prove": false
       },
-      "recommendation": "Gebruik echt apparaatbewijs wanneer dit voor de wijziging of releaseclaim vereist is."
+      "note": null
+    }
+  ],
+  "unexecuted_tests": [
+    {
+      "id": "A11Y-MANUAL",
+      "title": "Keyboard, zoom en screenreader",
+      "source_refs": [
+        "active/02-frontend-responsive-accessibility.md",
+        "support/88-playwright-axe-adapter.md"
+      ],
+      "reason": "Vereist aparte echte browser/input/AT-evidence wanneer de QA-bronnen dit voor de scope verplicht stellen."
+    },
+    {
+      "id": "RUNTIME-REAL-DEVICE",
+      "title": "Echt mobiel apparaat / echte Safari-iOS",
+      "source_refs": [
+        "active/11-evidence-levels-runtime-matrix.md",
+        "support/82-tool-en-browsermatrix.md"
+      ],
+      "reason": "Niet uitvoerbaar in deze read-only GitHub Actions runner."
     }
   ],
   "limitations": [
-    "Dit is publieke read-only observatie; geen ingelogde flow of productie-mutatie.",
+    "Publieke read-only observatie; geen ingelogde flow of productie-mutatie.",
     "Geen formele WCAG-conformiteitsclaim.",
-    "Axe automatiseert slechts een deel van toegankelijkheid; keyboard, zoom en screenreader blijven aparte tests.",
-    "Mobiele Playwright-emulatie is geen echt-device- of echte Safari/iOS-evidence.",
+    "Axe automatiseert slechts een deel van toegankelijkheid; keyboard, zoom en screenreader zijn aparte tests.",
+    "Mobiele Chromium-emulatie is geen echt-device- of echte Safari/iOS-evidence.",
     "Geen formulierinzendingen, betalingen, orders of andere writes.",
-    "Browserlab-timing is diagnostisch en vervangt geen echte Core Web Vitals-velddata."
-  ]
+    "Synthetische browser-timing vervangt geen echte Core Web Vitals-velddata.",
+    "De runner kent geen QA-prioriteit of releasebesluit toe; de Website QA Skill en actieve Drive-bronnen doen dat."
+  ],
+  "policy_evaluation": null,
+  "final_evidence_contract": {
+    "owner": "website-qa-checklist",
+    "schema": "support/83-evidence-manifest-schema.json",
+    "runtime_schema": "support/84-runtime-matrix-schema.json",
+    "instruction": "Transformeer deze raw evidence pas na bronvalidatie naar het formele Evidence Manifest 3.0 en laat de Skill de canonieke status, prioriteit en releasebeslissing bepalen."
+  }
 }
