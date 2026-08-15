@@ -1,17 +1,12 @@
 {
   "name": "webactueel-checklist-qa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Read-only MCP QA runner for the Webactueel website checklist workflow.",
+  "description": "Read-only Webactueel checklist runner executed automatically by GitHub Actions.",
   "scripts": {
-    "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/checklist.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.17.4",
-    "express": "^5.1.0",
-    "zod": "^3.25.76"
+    "scan": "node src/run.js",
+    "check": "node --check src/checklist.js && node --check src/run.js"
   },
   "engines": {
     "node": ">=20"
