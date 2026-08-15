@@ -52,6 +52,21 @@ function sanitizeResultForPublicJson(result) {
     };
     linkObservation.note = "Automatische linkprobes volgen geen query-URL's; zulke links worden als overgeslagen gerapporteerd en niet als kapot. Query-specifiek routegedrag vereist aparte veilige evidence.";
   }
+
+  const browserRuns = (result.browser_evidence?.runs || []).filter((run) => !run.browser_error);
+  const blockedWrites = browserRuns.flatMap((run) => (run.blocked_write_requests || []).map((item) => ({ viewport: run.viewport, ...item })));
+  result.observations.push({
+    id: "RUNTIME-MUTATION-GUARD",
+    category: "runtime",
+    title: "Browser write-method guard",
+    outcome: blockedWrites.length ? OUTCOME.INTERPRET : OUTCOME.OK,
+    source_refs: ["active/11-evidence-levels-runtime-matrix.md", "support/82-tool-en-browsermatrix.md", "support/88-playwright-axe-adapter.md"],
+    evidence_ids: browserRuns.map((run) => `EV-BROWSER-${run.viewport.toUpperCase()}`),
+    data: { allowed_methods: ["GET", "HEAD"], blocked_count: blockedWrites.length, blocked_requests: blockedWrites.slice(0, 20) },
+    note: blockedWrites.length
+      ? "De pagina probeerde schrijvende HTTP-methodes; de runner heeft die vóór netwerkverkeer geblokkeerd. Functionaliteit die daarvan afhankelijk is, is daardoor niet bewezen."
+      : "Geen schrijvende HTTP-methodes doorgelaten; de browserguard stond gedurende de run op GET/HEAD-only."
+  });
   return result;
 }
 
@@ -78,7 +93,7 @@ function buildEvidenceRegistry(result, runId, targetEnvironment) {
     registry.push({
       id: `EV-BROWSER-${viewport}`, type: "report", source: `runtime:chromium-${run.viewport}`, created_at: createdAt,
       environment, scope: result.final_url, evidence_level: "controlled_runtime", execution_mode: run.viewport === "mobile" ? "emulated" : "synthetic",
-      sha256: sha256Json({ status_code: run.status_code, final_url: run.final_url, readiness: run.readiness, dom: run.dom, console_errors: run.console_errors, page_errors: run.page_errors, request_failures: run.request_failures, mixed_content_requests: run.mixed_content_requests, websocket_requests: run.websocket_requests }),
+      sha256: sha256Json({ status_code: run.status_code, final_url: run.final_url, readiness: run.readiness, dom: run.dom, console_errors: run.console_errors, page_errors: run.page_errors, request_failures: run.request_failures, mixed_content_requests: run.mixed_content_requests, websocket_requests: run.websocket_requests, blocked_write_requests: run.blocked_write_requests }),
       artifacts: [screenshot?.source, trace?.source, domInventory?.source].filter(Boolean)
     });
     if (axe) registry.push({ id: `EV-AXE-${viewport}`, type: "report", source: axe.source, created_at: axe.created_at, environment, scope: `${result.final_url} (${run.viewport})`, evidence_level: "controlled_runtime", execution_mode: run.viewport === "mobile" ? "emulated" : "synthetic", sha256: axe.sha256 });
@@ -124,7 +139,8 @@ function stableBrowserRuns(runs = []) {
     return {
       viewport: run.viewport, viewport_size: run.viewport_size || null, status_code: run.status_code ?? null, final_url: run.final_url || null,
       readiness: run.readiness ? { body_visible: Boolean(run.readiness.body_visible), strategy: run.readiness.strategy || null, quiescence_reason: run.readiness.quiescence_reason || null } : null,
-      dom: stableDom(run.dom), axe: stableAxe(run.axe), console_errors: run.console_errors || [], page_errors: run.page_errors || [], request_failures: run.request_failures || [], mixed_content_requests: [...(run.mixed_content_requests || [])].sort(), websocket_requests: [...(run.websocket_requests || [])].sort()
+      dom: stableDom(run.dom), axe: stableAxe(run.axe), console_errors: run.console_errors || [], page_errors: run.page_errors || [], request_failures: run.request_failures || [], mixed_content_requests: [...(run.mixed_content_requests || [])].sort(), websocket_requests: [...(run.websocket_requests || [])].sort(),
+      blocked_write_requests: [...(run.blocked_write_requests || [])].sort((a, b) => `${a.method}:${a.url}`.localeCompare(`${b.method}:${b.url}`))
     };
   }).sort((a, b) => String(a.viewport).localeCompare(String(b.viewport)));
 }
