@@ -10,7 +10,7 @@
     "validate-result": "node src/validate-result.js results/latest.json",
     "finalize": "node src/finalize.js test/fixtures/policy.json results/formal-ci.json",
     "validate-formal": "node src/validate-formal.js results/formal-ci.json && node src/validate-formal-hardening.js results/formal-ci.json",
-    "check": "node --check src/net.js && node --check src/public-proxy.js && node --check src/privacy.js && node --check src/concurrency.js && node --check src/contracts.js && node --check src/artifacts.js && node --check src/browser.js && node --check src/checklist.js && node --check src/run.js && node --check src/validate-result.js && node --check src/finalize.js && node --check src/validate-formal.js && node --check src/validate-formal-hardening.js"
+    "check": "node --check src/net.js && node --check src/public-proxy.js && node --check src/privacy.js && node --check src/concurrency.js && node --check src/contracts.js && node --check src/artifacts.js && node --check src/browser.js && node --check src/checklist.js && node --check src/run.js && node --check src/supplemental.js && node --check src/append-supplemental.js && node --check src/validate-result.js && node --check src/finalize.js && node --check src/validate-formal.js && node --check src/validate-formal-hardening.js"
   },
   "dependencies": {
     "axe-core": "4.12.1",

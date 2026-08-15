@@ -94,6 +94,7 @@ jobs:
         run: node src/validate-formal-hardening.js results/formal-ci.json
       - name: Verify no-browser raw evidence cannot overclaim browser capabilities
         run: |
+          mkdir -p policy
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const raw = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));

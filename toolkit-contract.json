@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "owner_skill": "website-qa-checklist",
+  "project_id": "project-checklist",
+  "repository": "Yolol100/Checklist",
+  "evidence_role": "controlled_runtime_read_only_website_qa",
+  "requires_account": false,
+  "requires_api_key": false,
+  "requires_mcp": false,
+  "tools": [
+    {"id":"playwright-chromium","version":"1.62.0","trigger_when":"every browser-enabled QA run","outputs":["raw browser evidence"]},
+    {"id":"playwright-firefox","version":"1.62.0","trigger_when":"standard/full/release_verification","outputs":["supplemental cross-browser evidence"]},
+    {"id":"playwright-webkit","version":"1.62.0","trigger_when":"standard/full/release_verification","outputs":["supplemental cross-browser evidence"]},
+    {"id":"axe-core","version":"4.12.1","trigger_when":"primary Chromium browser evidence runs","outputs":["compact automated accessibility evidence"]},
+    {"id":"bounded-link-scan","version":"repo","trigger_when":"full or release_verification","outputs":["EV-LINK-BOUNDED"]},
+    {"id":"nu-html-checker","version":"asset-515207969","sha256":"c70279e260e5f4f9e95b3890ef6c9548f90ebdaec2a75219ec41694ab6241e34","trigger_when":"full or release_verification","outputs":["EV-HTML-VNU"]},
+    {"id":"lighthouse-ci","version":"0.15.1","trigger_when":"full or release_verification","outputs":["EV-LIGHTHOUSE-LAB"]}
+  ],
+  "usage_assertions": [
+    {"tool":"playwright-chromium","path":"src/browser.js","contains":"chromium"},
+    {"tool":"playwright-firefox","path":"src/supplemental.js","contains":"firefox"},
+    {"tool":"playwright-webkit","path":"src/supplemental.js","contains":"webkit"},
+    {"tool":"axe-core","path":"src/browser.js","contains":"axeSource"},
+    {"tool":"bounded-link-scan","path":"src/supplemental.js","contains":"boundedLinkScan"},
+    {"tool":"nu-html-checker","path":".github/workflows/run-checklist.yml","contains":"VNU_ASSET_ID"},
+    {"tool":"lighthouse-ci","path":".github/workflows/run-checklist.yml","contains":"@lhci/cli@0.15.1"}
+  ],
+  "boundaries": [
+    "Firefox/WebKit are Playwright synthetic evidence, not real device or branded Safari/iOS proof.",
+    "Axe does not prove WCAG conformance.",
+    "Lighthouse is lab diagnosis, not field Core Web Vitals.",
+    "The bounded link scan intentionally excludes query URLs and caps discovery/probes; probe methods remain GET/HEAD only.",
+    "The public repository does not persist full screenshots, traces, full axe JSON or full DOM snapshots."
+  ]
+}
