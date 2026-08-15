@@ -1,52 +1,97 @@
-# Webactueel Checklist QA
+# Webactueel Checklist QA Runner
 
-Gratis, read-only website-QA die vanuit ChatGPT Web via de bestaande GitHub-koppeling kan worden gestart.
+Gratis, read-only evidence-runner voor de geïnstalleerde `website-qa-checklist` Skill. ChatGPT Web gebruikt de bestaande GitHub-koppeling om GitHub Actions te starten; de repository is **niet** de QA-beleidslaag.
+
+## Eén keten
+
+`webactueel-workflow → website-qa-checklist → live Drive-bronnen → GitHub Checklist Runner → raw evidence → website-qa-checklist → releasegates → webactueel-workflow`
+
+De rollen zijn strikt gescheiden:
+
+- **Webactueel Workflow**: controller bij gecoördineerd/beheerd werk.
+- **Website QA Skill**: QA-eigenaar, scope, labels, prioriteit, evidence-interpretatie en releaseadvies.
+- **Google Drive Project Checklist**: actuele projectwaarheid.
+- **Deze repository**: alleen remote read-only evidencecollectie.
+
+## Verplichte volgorde
+
+ChatGPT mag de runner pas starten nadat de actuele Project Checklist-bronnen zijn gelezen.
+
+Minimaal voor iedere run:
+
+- `active/00-project-index-en-router.md`
+- `active/01-qa-proces-en-severity.md`
+- `active/11-evidence-levels-runtime-matrix.md`
+- `support/82-tool-en-browsermatrix.md`
+- `support/87-master-project-checklist.md`
+- `support/88-playwright-axe-adapter.md`
+
+Voor `release_verification` daarnaast verplicht:
+
+- `active/09-release-go-no-go-en-hertest.md`
+- `active/13-release-scoring-and-claim-gates.md`
+
+`requests/current.json` bevat daarom het actuele `source_set_version`, de SHA-256 van het live projectmanifest, de vooraf gelezen bronnen en de `selection_basis`. De runner weigert een onvolledige bronpreflight.
 
 ## Gebruik vanuit ChatGPT
 
-Vraag bijvoorbeeld:
+De gebruiker kan simpel vragen:
 
 > Voer Checklist standaard uit op https://example.com
 
 of:
 
-> Voer Checklist volledig uit op https://example.com
+> Doe een volledige releasecheck op https://example.com
 
-Je hebt voor deze runner geen extra QA-account, API-key, MCP-server, tunnel of hostingdienst nodig. De bestaande GitHub-koppeling is de uitvoeringsroute.
+ChatGPT doet de bronpreflight en GitHub-uitvoering. Er is geen extra QA-account, API-key, MCP-server, tunnel of betaalde testdienst nodig.
 
-## Werking
+## Wat de runner uitvoert
 
-1. ChatGPT schrijft een unieke scanrequest naar `requests/current.json`.
-2. GitHub Actions start automatisch de `Run Checklist` workflow.
-3. De runner voert alleen publieke, read-only observaties uit.
-4. Het bewijs wordt opgeslagen in `results/latest.json`.
-5. ChatGPT accepteert alleen het resultaat met hetzelfde `request_id`.
-6. De geïnstalleerde `website-qa-checklist` Skill en de actieve Checklist-bronnen in Google Drive interpreteren het bewijs en bepalen de uiteindelijke QA/releaseclaim.
-
-## Automatische checks
-
-- publieke bereikbaarheid, statuscodes en redirects
-- HTTPS
-- HSTS, CSP, X-Content-Type-Options, Referrer-Policy en Permissions-Policy
-- title, meta description, canonical en meta robots/noindex-observatie
+- publieke HTTP-status, redirects en responseheaders
+- HTTPS en aanwezigheid van belangrijke securityheaders
+- title, meta description, canonical en robots/noindex-observaties
 - H1 en ontbrekende `alt`-attributen
-- interne linksteekproef
-- robots.txt-observatie
-- formulierdetectie zonder iets te versturen
+- interne linksteekproef en robots.txt
+- formulierdetectie zonder submit
 - Chromium via Playwright
-- desktop + mobiele viewportemulatie bij `standard`/`full`
-- axe-core toegankelijkheidsscan
+- desktop + mobiele viewportemulatie
+- axe-core
 - `lang` en viewport-meta
 - console/page-errors
-- mixed-content subrequests
-- browserlab navigation timing
+- mixed-content requests
+- synthetische navigation timing
+
+## Reproduceerbaar bewijs
+
+Bij iedere browserrun worden onder `artifacts/latest/` opgeslagen:
+
+- volledige pagina-screenshot
+- volledige axe-JSON
+- Playwright trace
+
+`results/latest.json` bevat hashes, toolversies, browserconfiguratie, evidence-ID's, source refs, runtimebeperkingen en onuitgevoerde tests.
+
+## Raw evidence, geen beleid
+
+De runner gebruikt contract `raw-evidence-v1`.
+
+Hij geeft **geen** canonieke Checklist-status, prioriteit, severity, confidence of Go/No-Go-besluit. `policy_evaluation` blijft altijd `null`.
+
+De Website QA Skill zet de raw evidence daarna om naar:
+
+- `support/83-evidence-manifest-schema.json` (Evidence Manifest 3.0)
+- `support/84-runtime-matrix-schema.json` (Runtime Matrix 2.0)
+- canonieke labels en prioriteiten
+- de toepasselijke releaseclaim
+
+Daardoor kan bronbeleid veranderen zonder dat de GitHub-runner een tweede beleidswaarheid wordt.
 
 ## Bewijsgrenzen
 
-De runner verklaart onderstaande onderdelen bewust niet automatisch geslaagd:
+De runner bewijst niet automatisch:
 
-- keyboard- en zoomtests
-- echte screenreader/assistive-technologytest
+- keyboard- en zoomgedrag
+- echte screenreader/assistive technology
 - echte iPhone/iPad of echte Safari/iOS
 - echte inboxbezorging
 - formulierinzendingen
@@ -55,46 +100,31 @@ De runner verklaart onderstaande onderdelen bewust niet automatisch geslaagd:
 - formele WCAG-conformiteit
 - echte Core Web Vitals-velddata
 
-Die onderdelen blijven `Geblokkeerd` of `Te controleren` wanneer de Checklist-bronnen dat bewijs vereisen.
+Een live publieke browserrun kan alleen `production_observation` ondersteunen voor wat daadwerkelijk is geobserveerd. Mobiele emulatie blijft `execution_mode: emulated` en wordt nooit echt-devicebewijs.
 
 ## Veiligheid
 
-- Alleen `http`/`https`.
-- Lokale/private/gereserveerde IP-ranges worden geblokkeerd.
-- Redirects worden opnieuw gevalideerd.
-- URL's met credentials worden geweigerd.
-- Scanrequests met queryparameters worden geweigerd omdat deze repository publiek is en querystrings tokens/persoonsgegevens kunnen bevatten.
-- De runner logt niet in, verzendt geen formulieren en wijzigt de targetsite niet.
-- HTML-responses worden begrensd om onnodig grote downloads te voorkomen.
+- alleen publieke `http`/`https`-targets
+- lokale/private/gereserveerde IP-ranges geblokkeerd
+- redirects opnieuw gevalideerd
+- credentials en queryparameters geweigerd
+- geen login, form submit, betaling, order of andere targetmutatie
+- repository is publiek: geen secrets, persoonsgegevens of vertrouwelijke stagingpaden in requests
 
-## Checklist-bronnen
+## Bestanden
 
-Findings bevatten `source_refs` naar de relevante canonieke Checklist-bronnen, bijvoorbeeld:
-
-- `02-frontend-responsive-accessibility.md`
-- `03-formulieren-email-en-crm.md`
-- `04-seo-indexatie-en-migratie.md`
-- `06-wordpress-elementor-en-performance.md`
-- `08-security-en-technische-risicos.md`
-- `11-evidence-levels-runtime-matrix.md`
-- `82-tool-en-browsermatrix.md`
-- `88-playwright-axe-adapter.md`
-
-Deze bestanden worden niet gekopieerd naar GitHub. Google Drive blijft de projectwaarheid.
-
-## Repository
-
-- `SKILL.md` - ChatGPT-invocatiecontract
-- `agents/openai.yaml` - korte metadata
-- `requests/current.json` - laatste scanrequest
-- `.github/workflows/run-checklist.yml` - automatische uitvoering
-- `.github/workflows/ci.yml` - syntax- en browser-smoketest
-- `src/net.js` - publieke netwerk/SSRF-beveiliging
-- `src/browser.js` - Playwright + axe adapter
-- `src/checklist.js` - checks, labels en evidence
-- `src/run.js` - request/result adapter
-- `results/latest.json` - laatste afgeronde evidence
+- `SKILL.md` — adaptercontract; geen tweede QA-owner
+- `requests/current.json` — source-first scanrequest
+- `.github/workflows/run-checklist.yml` — uitvoeringsworkflow
+- `.github/workflows/ci.yml` — syntax-, contract- en artifactvalidatie
+- `src/net.js` — publieke netwerk/SSRF-beveiliging
+- `src/browser.js` — Playwright + axe + artifacts
+- `src/checklist.js` — neutrale observaties
+- `src/run.js` — source-preflight en evidencepakket
+- `src/validate-result.js` — blokkeert beleidsvelden/drift
+- `results/latest.json` — laatste raw evidence
+- `artifacts/latest/` — laatste screenshots, traces en volledige axe-JSON
 
 ## Projectwaarheid
 
-Deze repository is alleen de uitvoeringslaag. De geïnstalleerde `website-qa-checklist` Skill en de actieve geregistreerde Checklist-bronnen in Google Drive blijven leidend voor scope, prioriteit, bewijsvereisten en eindbesluit.
+Google Drive blijft de projectwaarheid. De repository kopieert geen Checklist-beleid en bepaalt nooit zelfstandig of een site `Go`, `No-go`, `Geslaagd` of `Mislukt` is.
