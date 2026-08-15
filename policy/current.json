@@ -1,7 +1,7 @@
 {
   "schema_version": "policy-evaluation-v1",
-  "evaluation_id": "QA-INTEGRATION-v0.5-main",
-  "request_id": "fixture-v0.5-source-bound",
+  "evaluation_id": "QA-FINAL-E2E-v0.5-main",
+  "request_id": "final-e2e-v0.5-20260815-1755z",
   "source_context": {
     "project_id": "project-checklist",
     "source_set_version": "2026-08-14.1-reconnaissance-before-action",
@@ -18,12 +18,14 @@
     "app_connectors": true
   },
   "scope": {
-    "label": "Integratievalidatie Checklist runner v0.5 op main",
+    "label": "Finale integratievalidatie Checklist runner v0.5 op main",
     "included": [
-      "source-bound raw requestacceptatie",
+      "source-bound raw requestacceptatie met bronhashes",
       "publieke HTTP evidencecollectie",
       "Chromium desktop rendered-UI readiness en artifacts",
       "Chromium mobiele viewportemulatie en artifacts",
+      "rendered-DOM authority bij nul interne links",
+      "materiële artifact fingerprint",
       "raw-evidence-v1 validatie",
       "deterministische policy-evaluation naar Evidence Manifest 3.0 en Runtime Matrix 2.0"
     ],
@@ -32,10 +34,11 @@
       "security-, SEO- of toegankelijkheidsacceptatie van example.com",
       "authenticated flows",
       "formulierinzendingen en betalingen",
-      "echt apparaat, echte Safari/iOS en assistive technology"
+      "echt apparaat, echte Safari/iOS en assistive technology",
+      "staging/livegangclaim"
     ]
   },
-  "runtime_selection_basis": "Voor deze integratievalidatie moeten de publieke HTTP-laag en beide geïmplementeerde Chromium-runtimes aantoonbaar zijn uitgevoerd; hogere handmatige lagen vallen expliciet buiten deze testscope.",
+  "runtime_selection_basis": "Voor deze finale integratievalidatie moeten de publieke HTTP-laag en beide geïmplementeerde Chromium-runtimes aantoonbaar zijn uitgevoerd; staging en hogere handmatige lagen vallen expliciet buiten deze integratiescope.",
   "required_runtime_ids": [
     "RT-PUBLIC-HTTP",
     "RT-BROWSER-DESKTOP",
@@ -46,7 +49,7 @@
   "false_positives": [],
   "rounds": [
     {
-      "request_id": "fixture-v0.5-source-bound",
+      "request_id": "final-e2e-v0.5-20260815-1755z",
       "status": "passed"
     }
   ],
@@ -59,7 +62,7 @@
   },
   "monitoring": {
     "ready": false,
-    "plan": "Geen livegangclaim binnen deze integratiescope; workflow- en CI-status zijn apart gecontroleerd.",
+    "plan": "Geen livegangclaim binnen deze integratiescope; workflow- en CI-status worden afzonderlijk gecontroleerd.",
     "owner": "website-qa-checklist",
     "evidence_ids": []
   },
