@@ -1,18 +1,18 @@
 {
   "schema_version": "raw-evidence-v1",
   "request": {
-    "request_id": "fixture-v0.4-source-first",
+    "request_id": "reaudit-20260815-1659z",
     "url": "https://example.com/",
     "level": "standard",
     "task_type": "audit",
-    "requested_at": "2026-08-15T15:12:00Z",
+    "requested_at": "2026-08-15T16:59:00Z",
     "requested_by": "ChatGPT"
   },
   "source_context": {
     "project_id": "project-checklist",
     "source_set_version": "2026-08-14.1-reconnaissance-before-action",
     "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46",
-    "selection_basis": "Website QA Skill preflight for a standard public read-only audit using the registered GitHub connector and remote GitHub Actions browser runner.",
+    "selection_basis": "Independent re-audit of the integrated Website QA chain from ChatGPT Web through the connected GitHub app and remote GitHub Actions runner, after re-reading the live Project Checklist manifest and mandatory source set.",
     "selected_sources": [
       "active/00-project-index-en-router.md",
       "active/01-qa-proces-en-severity.md",
@@ -33,9 +33,9 @@
   },
   "target": "https://example.com/",
   "final_url": "https://example.com/",
-  "started_at": "2026-08-15T15:20:31.309Z",
-  "completed_at": "2026-08-15T15:20:33.326Z",
-  "configuration_hash": "c5092da6d3463058543cf4b682d842a25ab35a3a76c6ce1c1c902c751f333342",
+  "started_at": "2026-08-15T17:03:05.624Z",
+  "completed_at": "2026-08-15T17:03:07.272Z",
+  "configuration_hash": "c36a504d11a4ab66244cce367de93c226ad409f3bef02b0d4a23e40a2a44a810",
   "tool_versions": {
     "playwright": "1.62.0",
     "axe_core": "4.12.1"
@@ -63,7 +63,7 @@
       "id": "EV-HTTP-MAIN",
       "type": "response",
       "source": "runtime:main-http-response",
-      "created_at": "2026-08-15T15:20:33.326Z",
+      "created_at": "2026-08-15T17:03:07.272Z",
       "environment": "github-actions",
       "scope": "https://example.com/",
       "evidence_level": "production_observation",
@@ -74,7 +74,7 @@
       "id": "EV-LINK-SAMPLE",
       "type": "report",
       "source": "runtime:internal-link-sample",
-      "created_at": "2026-08-15T15:20:33.326Z",
+      "created_at": "2026-08-15T17:03:07.272Z",
       "environment": "github-actions",
       "scope": "https://example.com/",
       "evidence_level": "production_observation",
@@ -85,7 +85,7 @@
       "id": "EV-ROBOTS",
       "type": "response",
       "source": "runtime:robots.txt",
-      "created_at": "2026-08-15T15:20:33.326Z",
+      "created_at": "2026-08-15T17:03:07.272Z",
       "environment": "github-actions",
       "scope": "https://example.com/robots.txt",
       "evidence_level": "production_observation",
@@ -96,12 +96,12 @@
       "id": "EV-BROWSER-DESKTOP",
       "type": "report",
       "source": "runtime:chromium-desktop",
-      "created_at": "2026-08-15T15:20:33.326Z",
+      "created_at": "2026-08-15T17:03:07.272Z",
       "environment": "github-actions",
       "scope": "https://example.com/",
       "evidence_level": "controlled_runtime",
       "execution_mode": "synthetic",
-      "sha256": "cbff7d9c7aab0599de69847e3b97c4a09e0642fc1a217459df4e43d80224034c",
+      "sha256": "5c643df5f512cea8b4e90eaa1bc997ece38085b2210fe2b36e6afafe59dc478a",
       "artifacts": [
         "browser/desktop/page.png",
         "browser/desktop/trace.zip"
@@ -111,18 +111,18 @@
       "id": "EV-AXE-DESKTOP",
       "type": "report",
       "source": "browser/desktop/axe.json",
-      "created_at": "2026-08-15T15:20:32.814Z",
+      "created_at": "2026-08-15T17:03:06.865Z",
       "environment": "github-actions",
       "scope": "https://example.com/ (desktop)",
       "evidence_level": "controlled_runtime",
       "execution_mode": "synthetic",
-      "sha256": "f5f70a289e82b01c637bc311ba843d6253ceef021c2ca48c009edcf07fe7fe59"
+      "sha256": "fd42c76db693b1df8089e66fee1ae7a5d48ab5e711d13278a2eb9f6663a75fc3"
     },
     {
       "id": "EV-FILE-BROWSER-DESKTOP-PAGE-PNG",
       "type": "screenshot",
       "source": "browser/desktop/page.png",
-      "created_at": "2026-08-15T15:20:32.813Z",
+      "created_at": "2026-08-15T17:03:06.864Z",
       "environment": "github-actions",
       "scope": "desktop full-page screenshot",
       "sha256": "b0250fbbe6cb5b9233ce8c3d2002e409d42cd0ab58ae453068063ad8b30156c1",
@@ -133,10 +133,10 @@
       "id": "EV-FILE-BROWSER-DESKTOP-AXE-JSON",
       "type": "report",
       "source": "browser/desktop/axe.json",
-      "created_at": "2026-08-15T15:20:32.814Z",
+      "created_at": "2026-08-15T17:03:06.865Z",
       "environment": "github-actions",
       "scope": "desktop volledige axe JSON",
-      "sha256": "f5f70a289e82b01c637bc311ba843d6253ceef021c2ca48c009edcf07fe7fe59",
+      "sha256": "fd42c76db693b1df8089e66fee1ae7a5d48ab5e711d13278a2eb9f6663a75fc3",
       "evidence_level": "controlled_runtime",
       "execution_mode": "synthetic"
     },
@@ -144,10 +144,10 @@
       "id": "EV-FILE-BROWSER-DESKTOP-TRACE-ZIP",
       "type": "trace",
       "source": "browser/desktop/trace.zip",
-      "created_at": "2026-08-15T15:20:32.862Z",
+      "created_at": "2026-08-15T17:03:06.902Z",
       "environment": "github-actions",
       "scope": "desktop Playwright trace",
-      "sha256": "fdd9159e978f6ef5102a71c9715d9e8ba5db114f810fb7736cf219d00b24deb4",
+      "sha256": "9c649590648df25923f9371f53ddfcf1ac9a6a7caa3cbda75c0d75f72c254614",
       "evidence_level": "controlled_runtime",
       "execution_mode": "synthetic"
     },
@@ -155,12 +155,12 @@
       "id": "EV-BROWSER-MOBILE",
       "type": "report",
       "source": "runtime:chromium-mobile",
-      "created_at": "2026-08-15T15:20:33.326Z",
+      "created_at": "2026-08-15T17:03:07.272Z",
       "environment": "github-actions",
       "scope": "https://example.com/",
       "evidence_level": "controlled_runtime",
       "execution_mode": "emulated",
-      "sha256": "395f30049d7f53b5dd451424432205050945a9c29e1db6a1c6f97a85030df0ab",
+      "sha256": "7145aa1040c70ee0e6489c1ceccaea8663d27292e57c40eae9dfdbddb7f7eee6",
       "artifacts": [
         "browser/mobile/page.png",
         "browser/mobile/trace.zip"
@@ -170,18 +170,18 @@
       "id": "EV-AXE-MOBILE",
       "type": "report",
       "source": "browser/mobile/axe.json",
-      "created_at": "2026-08-15T15:20:33.254Z",
+      "created_at": "2026-08-15T17:03:07.215Z",
       "environment": "github-actions",
       "scope": "https://example.com/ (mobile)",
       "evidence_level": "controlled_runtime",
       "execution_mode": "emulated",
-      "sha256": "b49c7f1d2e9556f590c5e5bdefe4349f46a9068b51477ef975f134bd519a9737"
+      "sha256": "e9a4b96d6a2d85a995678a878f7001af6b600a2cd690ad7047256405d1a5f43c"
     },
     {
       "id": "EV-FILE-BROWSER-MOBILE-PAGE-PNG",
       "type": "screenshot",
       "source": "browser/mobile/page.png",
-      "created_at": "2026-08-15T15:20:33.253Z",
+      "created_at": "2026-08-15T17:03:07.213Z",
       "environment": "github-actions",
       "scope": "mobile full-page screenshot",
       "sha256": "79aced1cf245c456caa0dcfe73cf43f71d5790fb09693f626b827f35ea201770",
@@ -192,10 +192,10 @@
       "id": "EV-FILE-BROWSER-MOBILE-AXE-JSON",
       "type": "report",
       "source": "browser/mobile/axe.json",
-      "created_at": "2026-08-15T15:20:33.254Z",
+      "created_at": "2026-08-15T17:03:07.215Z",
       "environment": "github-actions",
       "scope": "mobile volledige axe JSON",
-      "sha256": "b49c7f1d2e9556f590c5e5bdefe4349f46a9068b51477ef975f134bd519a9737",
+      "sha256": "e9a4b96d6a2d85a995678a878f7001af6b600a2cd690ad7047256405d1a5f43c",
       "evidence_level": "controlled_runtime",
       "execution_mode": "emulated"
     },
@@ -203,10 +203,10 @@
       "id": "EV-FILE-BROWSER-MOBILE-TRACE-ZIP",
       "type": "trace",
       "source": "browser/mobile/trace.zip",
-      "created_at": "2026-08-15T15:20:33.293Z",
+      "created_at": "2026-08-15T17:03:07.245Z",
       "environment": "github-actions",
       "scope": "mobile Playwright trace",
-      "sha256": "2e00dae53eaec1165bd9aa2a5bb4efd5de940e11967f7fd25ad1898ae092c615",
+      "sha256": "e7dcc5ea386806c0e90723fbe8b7ce83ea8d4dd12c47e4e1b8d7e3e6c8202a00",
       "evidence_level": "controlled_runtime",
       "execution_mode": "emulated"
     }
@@ -718,9 +718,9 @@
           {
             "viewport": "desktop",
             "navigation_timing": {
-              "ttfb_ms": 10,
-              "dom_content_loaded_ms": 60,
-              "load_ms": 61,
+              "ttfb_ms": 7,
+              "dom_content_loaded_ms": 43,
+              "load_ms": 44,
               "transfer_size": 618,
               "encoded_body_size": 318
             }
@@ -728,9 +728,9 @@
           {
             "viewport": "mobile",
             "navigation_timing": {
-              "ttfb_ms": 13,
-              "dom_content_loaded_ms": 36,
-              "load_ms": 37,
+              "ttfb_ms": 7,
+              "dom_content_loaded_ms": 32,
+              "load_ms": 33,
               "transfer_size": 618,
               "encoded_body_size": 318
             }
