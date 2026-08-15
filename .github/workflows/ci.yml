@@ -10,26 +10,35 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
       - name: Install locked dependencies
-        run: npm ci --no-audit --no-fund
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Syntax check
         run: npm run check
       - name: Adversarial unit and workflow tests
         run: npm test
+      - name: Install Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
       - name: Smoke test raw evidence runner
         run: npm run scan
       - name: Validate raw evidence contract
         run: npm run validate-result
+      - name: Verify public-test evidence is not mislabeled production
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const result = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
+          const http = result.evidence_registry.find((item) => item.id === 'EV-HTTP-MAIN');
+          if (result.request.target_environment !== 'public_test') throw new Error('CI fixture must remain public_test');
+          if (http?.evidence_level === 'production_observation') throw new Error('public_test target was incorrectly labeled production_observation');
+          NODE
       - name: Verify rendered DOM authority
         run: |
           node --input-type=module <<'NODE'
@@ -40,6 +49,7 @@ jobs:
           if (readiness?.outcome !== 'observed_ok') throw new Error('UI-readiness fixture is niet observed_ok');
           if (links?.data?.basis !== 'rendered_dom') throw new Error(`LINK-001 moet rendered_dom gebruiken, kreeg ${links?.data?.basis}`);
           if (!links?.evidence_ids?.includes('EV-BROWSER-DESKTOP')) throw new Error('LINK-001 mist rendered browser-evidence');
+          if (links?.data?.concurrency_limit !== 6) throw new Error('Linkprobe concurrency guard ontbreekt');
           NODE
       - name: Verify material fingerprint repeatability
         run: |
@@ -51,15 +61,15 @@ jobs:
           test "$FIRST" = "$SECOND"
       - name: Verify run history and reproducibility artifacts
         run: |
-          test -f results/runs/fixture-v0.5-source-bound.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/page.png
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/axe.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/dom-inventory.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/trace.zip
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/page.png
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/axe.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/dom-inventory.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/trace.zip
+          test -f results/runs/final-e2e-v0.5-20260815-1755z.json
+          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/desktop/page.png
+          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/desktop/axe.json
+          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/desktop/dom-inventory.json
+          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/desktop/trace.zip
+          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/page.png
+          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/axe.json
+          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/dom-inventory.json
+          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/trace.zip
       - name: Build formal evidence manifest from isolated policy fixture
         run: node src/finalize.js policy/fixture.json results/formal-ci.json
       - name: Validate formal Evidence Manifest 3.0 semantics
