@@ -30,9 +30,10 @@ jobs:
         id: request
         shell: bash
         run: |
+          TOTAL_FILES="$(git show --pretty='' --name-only "$GITHUB_SHA" | sed '/^$/d' | wc -l | tr -d ' ')"
           mapfile -t FILES < <(git show --pretty='' --name-only "$GITHUB_SHA" | grep -E '^requests/queue/[A-Za-z0-9._-]+\.json$' || true)
-          if [ "${#FILES[@]}" -ne 1 ]; then
-            echo "Expected exactly one queue request in triggering commit; found ${#FILES[@]}." >&2
+          if [ "$TOTAL_FILES" -ne 1 ] || [ "${#FILES[@]}" -ne 1 ]; then
+            echo "Trigger commit must contain exactly one queue request and no other changes; total=$TOTAL_FILES queue=${#FILES[@]}." >&2
             exit 1
           fi
           REQUEST_PATH="${FILES[0]}"
