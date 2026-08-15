@@ -1,15 +1,15 @@
 {
-  "request_id": "fixture-v0.5-source-bound",
+  "request_id": "final-e2e-v0.5-20260815-1755z",
   "url": "https://example.com/",
   "level": "standard",
   "task_type": "audit",
-  "requested_at": "2026-08-15T17:35:00Z",
+  "requested_at": "2026-08-15T17:55:00Z",
   "requested_by": "ChatGPT",
   "source_context": {
     "project_id": "project-checklist",
     "source_set_version": "2026-08-14.1-reconnaissance-before-action",
     "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46",
-    "selection_basis": "CI fixture for a standard public read-only audit through the registered GitHub Actions browser runner after source-first preflight.",
+    "selection_basis": "Final end-to-end integration verification on main after rendered-DOM, stable-fingerprint, formal-evidence and staging-gate hardening. Public read-only audit fixture only.",
     "selected_sources": [
       "active/00-project-index-en-router.md",
       "active/01-qa-proces-en-severity.md",
