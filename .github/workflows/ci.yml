@@ -23,7 +23,21 @@ jobs:
       - name: Syntax check
         run: npm run check
       - name: Adversarial unit and workflow tests
-        run: npm test
+        shell: bash
+        run: |
+          set +e
+          npm test 2>&1 | tee /tmp/checklist-tests.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -ne 0 ]; then
+            {
+              echo '### Unit/workflow test failure'
+              echo '```text'
+              tail -n 160 /tmp/checklist-tests.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit "$code"
+          fi
       - name: Install Chromium
         run: node node_modules/playwright/cli.js install --with-deps chromium
       - name: Smoke test raw evidence runner
