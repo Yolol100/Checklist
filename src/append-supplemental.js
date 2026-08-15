@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { sha256Json } from "./artifacts.js";
+import { mergeObservation } from "./supplemental-merge.js";
 
 const requestPath = process.argv[2];
 if (!requestPath) throw new Error("request path ontbreekt");
@@ -17,9 +18,8 @@ function addEvidence(item) {
   payload.evidence_registry.push(item);
   evidenceIds.push(item.id);
 }
-function addObservation(item) {
-  if (payload.observations.some((existing) => existing.id === item.id)) throw new Error(`dubbele observatie ${item.id}`);
-  payload.observations.push(item);
+function addObservation(item, options) {
+  return mergeObservation(payload.observations, item, options);
 }
 
 const crossRuns = supplemental.cross_browser || [];
@@ -35,7 +35,7 @@ if (crossRuns.length) {
     evidence_ids: successful.map((run) => `EV-BROWSER-${run.browser.toUpperCase()}-DESKTOP`),
     data: { requested: crossRuns.map((run) => run.browser), completed: successful.map((run) => run.browser), errors: crossRuns.filter((run) => run.browser_error).map((run) => ({ browser: run.browser, error: run.browser_error })), summaries: successful.map((run) => ({ browser: run.browser, status_code: run.status_code, final_url: run.final_url, dom: run.dom, console_error_count: run.console_errors.length, page_error_count: run.page_errors.length, blocked_write_count: run.blocked_write_requests.length })) },
     note: "Firefox en Playwright WebKit zijn synthetische controlled-runtime checks. WebKit is geen bewijs voor echte branded Safari/iOS, echte apparaten of assistive technology."
-  });
+  }, { replaceNotExecutedPlaceholder: true });
 }
 
 if (supplemental.link_scan) {
