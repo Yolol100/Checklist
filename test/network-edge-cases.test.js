@@ -5,6 +5,7 @@ import {
   isBlockedHostnameLiteral,
   isPrivateIp,
   readTextLimited,
+  resolvePublicHost,
   safeFetch
 } from "../src/net.js";
 
@@ -20,6 +21,7 @@ const blockedIpv6 = [
   "5f00::1", "fc00::1", "fd00::1", "fe80::1", "fec0::1", "ff02::1"
 ];
 const allowedIpv6 = ["2606:4700:4700::1111", "2001:4860:4860::8888"];
+const publicAddresses = [{ address: "8.8.8.8", family: 4 }];
 
 test("IP classifier blocks IANA special, private, transition, benchmark and documentation ranges", () => {
   for (const address of blockedIpv4) assert.equal(isPrivateIp(address), true, `${address} should be blocked`);
@@ -31,54 +33,75 @@ test("IP classifier keeps well-known global addresses public", () => {
   for (const address of allowedIpv6) assert.equal(isPrivateIp(address), false, `${address} should be public`);
 });
 
-test("hostname literals reject local/private conventions", () => {
-  for (const host of ["localhost", "foo.local", "x.localhost", "router.internal", "device.lan", "box.home", "127.0.0.1", "[::1]"]) {
+test("hostname literals reject local/private conventions including trailing-dot localhost", () => {
+  for (const host of ["localhost", "localhost.", "foo.local", "x.localhost", "router.internal", "device.lan", "box.home", "127.0.0.1", "[::1]"]) {
     assert.equal(isBlockedHostnameLiteral(host), true, `${host} should be blocked`);
   }
   assert.equal(isBlockedHostnameLiteral("example.com"), false);
 });
 
-test("assertPublicUrl rejects credentials, unsafe protocols and query strings when requested", async () => {
+test("resolvePublicHost rejects mixed public/private DNS answers", async () => {
+  const lookup = async () => [{ address: "8.8.8.8", family: 4 }, { address: "127.0.0.1", family: 4 }];
+  await assert.rejects(() => resolvePublicHost("rebind.example", lookup), /privaat|gereserveerde/);
+});
+
+test("assertPublicUrl rejects credentials, unsafe protocols, non-web ports and query strings when requested", async () => {
   await assert.rejects(() => assertPublicUrl("file:///etc/passwd"), /http- en https/);
   await assert.rejects(() => assertPublicUrl("https://user:pass@8.8.8.8/"), /gebruikersnaam of wachtwoord/);
+  await assert.rejects(() => assertPublicUrl("http://8.8.8.8:22/"), /poorten 80.*443/);
+  await assert.rejects(() => assertPublicUrl("https://8.8.8.8:8443/"), /poorten 80.*443/);
   await assert.rejects(() => assertPublicUrl("https://8.8.8.8/?secret=1", { allowQuery: false }), /zonder queryparameters/);
   const clean = await assertPublicUrl("https://8.8.8.8/path#fragment", { allowQuery: false });
   assert.equal(clean.href, "https://8.8.8.8/path");
 });
 
-test("safeFetch preserves the no-query rule across redirects", async () => {
-  const originalFetch = globalThis.fetch;
+test("safeFetch uses the validated resolver result as its actual transport target", async () => {
+  let resolverCalls = 0;
+  let capturedAddresses;
+  const resolver = async () => {
+    resolverCalls += 1;
+    return [{ address: "8.8.4.4", family: 4 }];
+  };
+  const requester = async (_url, addresses) => {
+    capturedAddresses = addresses;
+    return new Response("ok", { status: 200 });
+  };
+  const result = await safeFetch("https://example.com/", { resolver, requester });
+  assert.equal(result.response.status, 200);
+  assert.equal(resolverCalls, 1);
+  assert.deepEqual(capturedAddresses, [{ address: "8.8.4.4", family: 4 }]);
+});
+
+test("safeFetch rejects query URLs by default before transport", async () => {
   let calls = 0;
-  globalThis.fetch = async () => {
+  const requester = async () => { calls += 1; return new Response("ok"); };
+  await assert.rejects(() => safeFetch("https://8.8.8.8/?token=secret", { requester }), /geen URL's met queryparameters/);
+  assert.equal(calls, 0);
+});
+
+test("safeFetch preserves the no-query rule across redirects", async () => {
+  let calls = 0;
+  const requester = async () => {
     calls += 1;
     return new Response(null, { status: 302, headers: { location: "https://8.8.8.8/?token=secret" } });
   };
-  try {
-    await assert.rejects(() => safeFetch("https://8.8.8.8/", { allowQuery: false }), /zonder queryparameters/);
-    assert.equal(calls, 1, "redirect target must be rejected before a second request");
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+  await assert.rejects(() => safeFetch("https://8.8.8.8/", { resolver: async () => publicAddresses, requester }), /geen redirects met queryparameters/);
+  assert.equal(calls, 1, "redirect target must be rejected before a second request");
 });
 
-test("safeFetch rejects redirect targets into private networks", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(null, { status: 302, headers: { location: "http://127.0.0.1/admin" } });
-  try {
-    await assert.rejects(() => safeFetch("https://8.8.8.8/"), /private|gereserveerde|Lokale/i);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+test("safeFetch rejects redirect targets into private networks before transport", async () => {
+  let calls = 0;
+  const requester = async () => {
+    calls += 1;
+    return new Response(null, { status: 302, headers: { location: "http://127.0.0.1/admin" } });
+  };
+  await assert.rejects(() => safeFetch("https://8.8.8.8/", { requester }), /private|gereserveerde|Lokale/i);
+  assert.equal(calls, 1);
 });
 
 test("safeFetch enforces redirect limits", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (url) => new Response(null, { status: 302, headers: { location: new URL("/next", url).href } });
-  try {
-    await assert.rejects(() => safeFetch("https://8.8.8.8/", { maxRedirects: 1 }), /Te veel redirects/);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+  const requester = async (url) => new Response(null, { status: 302, headers: { location: new URL("/next", url).href } });
+  await assert.rejects(() => safeFetch("https://8.8.8.8/", { maxRedirects: 1, requester }), /Te veel redirects/);
 });
 
 test("readTextLimited rejects declared and streamed oversize responses", async () => {
