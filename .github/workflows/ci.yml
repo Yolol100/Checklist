@@ -61,17 +61,17 @@ jobs:
           test "$FIRST" = "$SECOND"
       - name: Verify run history and reproducibility artifacts
         run: |
-          test -f results/runs/final-e2e-v0.5-20260815-1755z.json
-          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/desktop/page.png
-          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/desktop/axe.json
-          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/desktop/dom-inventory.json
-          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/desktop/trace.zip
-          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/page.png
-          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/axe.json
-          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/dom-inventory.json
-          test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/trace.zip
+          test -f results/runs/ci-public-test-v0.6.json
+          test -f artifacts/runs/ci-public-test-v0.6/browser/desktop/page.png
+          test -f artifacts/runs/ci-public-test-v0.6/browser/desktop/axe.json
+          test -f artifacts/runs/ci-public-test-v0.6/browser/desktop/dom-inventory.json
+          test -f artifacts/runs/ci-public-test-v0.6/browser/desktop/trace.zip
+          test -f artifacts/runs/ci-public-test-v0.6/browser/mobile/page.png
+          test -f artifacts/runs/ci-public-test-v0.6/browser/mobile/axe.json
+          test -f artifacts/runs/ci-public-test-v0.6/browser/mobile/dom-inventory.json
+          test -f artifacts/runs/ci-public-test-v0.6/browser/mobile/trace.zip
       - name: Build formal evidence manifest from current policy fixture
-        run: node src/finalize.js policy/fixture.json results/formal-ci.json
+        run: node src/finalize.js test/fixtures/policy.json results/formal-ci.json
       - name: Validate formal Evidence Manifest 3.0 semantics
         run: node src/validate-formal.js results/formal-ci.json
       - name: Validate formal cross-field hardening
@@ -87,7 +87,7 @@ jobs:
           raw.runtime_observation.browser_evidence = null;
           raw.tool_versions = { runner_test_fixture: 'no-browser' };
           fs.writeFileSync('results/runs/no-browser-capability.json', `${JSON.stringify(raw, null, 2)}\n`);
-          const policy = JSON.parse(fs.readFileSync('policy/fixture.json', 'utf8'));
+          const policy = JSON.parse(fs.readFileSync('test/fixtures/policy.json', 'utf8'));
           policy.evaluation_id = 'QA-NO-BROWSER-v0.6';
           policy.request_id = 'no-browser-capability';
           policy.rounds = [{ request_id: 'no-browser-capability', status: 'passed' }];

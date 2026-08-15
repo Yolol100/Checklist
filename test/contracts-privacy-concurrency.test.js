@@ -5,7 +5,7 @@ import { assertRequestContract, assertSafeIdentifier } from "../src/contracts.js
 import { mapWithConcurrency } from "../src/concurrency.js";
 import { sanitizeEvidenceText, sanitizeResponseHeaders, sanitizeUrlForEvidence } from "../src/privacy.js";
 
-const fixture = JSON.parse(fs.readFileSync("requests/current.json", "utf8"));
+const fixture = JSON.parse(fs.readFileSync("test/fixtures/request.json", "utf8"));
 const clone = (value) => structuredClone(value);
 
 test("safe identifiers prevent traversal, aliases and unsafe filenames", () => {
