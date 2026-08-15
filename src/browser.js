@@ -5,6 +5,7 @@ import { chromium } from "playwright";
 import { assertPublicUrl } from "./net.js";
 import { describeArtifact, writeJsonArtifact } from "./artifacts.js";
 import { sanitizeEvidenceText, sanitizeUrlForEvidence, sanitizeUrlList } from "./privacy.js";
+import { startPublicNetworkProxy } from "./public-proxy.js";
 
 const require = createRequire(import.meta.url);
 const axeSource = require("axe-core").source;
@@ -22,6 +23,9 @@ const BROWSER_CONFIG = {
   reducedMotion: "reduce",
   serviceWorkers: "block",
   webSockets: "blocked",
+  dnsPinningProxy: true,
+  webRtcIpHandlingPolicy: "disable_non_proxied_udp",
+  quic: "disabled",
   waitUntil: "domcontentloaded",
   navigationTimeoutMs: 25_000,
   bodyVisibleTimeoutMs: 8_000,
@@ -42,18 +46,13 @@ function compactAxeViolations(violations) {
 
 async function installPublicRequestGuard(context) {
   const blockedWebSockets = [];
-
   await context.route("**/*", async (route) => {
     const request = route.request();
-    const requestUrl = request.url();
     let parsed;
-    try {
-      parsed = new URL(requestUrl);
-    } catch {
+    try { parsed = new URL(request.url()); } catch {
       await route.abort("blockedbyclient");
       return;
     }
-
     if (["data:", "blob:", "about:"].includes(parsed.protocol)) {
       await route.continue();
       return;
@@ -62,7 +61,6 @@ async function installPublicRequestGuard(context) {
       await route.abort("blockedbyclient");
       return;
     }
-
     try {
       await assertPublicUrl(parsed, { allowQuery: !request.isNavigationRequest() });
       await route.continue();
@@ -70,28 +68,21 @@ async function installPublicRequestGuard(context) {
       await route.abort("blockedbyclient");
     }
   });
-
   await context.routeWebSocket("**/*", async (webSocketRoute) => {
     blockedWebSockets.push(sanitizeUrlForEvidence(webSocketRoute.url()));
     await webSocketRoute.close({ code: 1008, reason: "Blocked by read-only QA runner" });
   });
-
   return { blockedWebSockets };
 }
 
 async function waitForMeaningfulReadiness(page) {
   const started = Date.now();
-  await page.locator("body").waitFor({
-    state: "visible",
-    timeout: BROWSER_CONFIG.bodyVisibleTimeoutMs
-  });
-
+  await page.locator("body").waitFor({ state: "visible", timeout: BROWSER_CONFIG.bodyVisibleTimeoutMs });
   const quiescence = await page.evaluate(({ quietWindowMs, maxWaitMs }) => new Promise((resolve) => {
     let finished = false;
     let quietTimer;
     let maxTimer;
     const startedAt = performance.now();
-
     const finish = (reason) => {
       if (finished) return;
       finished = true;
@@ -100,26 +91,15 @@ async function waitForMeaningfulReadiness(page) {
       clearTimeout(maxTimer);
       resolve({ reason, elapsed_ms: Math.round(performance.now() - startedAt) });
     };
-
     const scheduleQuiet = () => {
       clearTimeout(quietTimer);
       quietTimer = setTimeout(() => finish("dom_quiet"), quietWindowMs);
     };
-
     const observer = new MutationObserver(scheduleQuiet);
-    observer.observe(document.documentElement, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      characterData: true
-    });
+    observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
     scheduleQuiet();
     maxTimer = setTimeout(() => finish("max_wait_reached"), maxWaitMs);
-  }), {
-    quietWindowMs: BROWSER_CONFIG.domQuietWindowMs,
-    maxWaitMs: BROWSER_CONFIG.domQuietMaxWaitMs
-  });
-
+  }), { quietWindowMs: BROWSER_CONFIG.domQuietWindowMs, maxWaitMs: BROWSER_CONFIG.domQuietMaxWaitMs });
   return {
     body_visible: true,
     strategy: "body-visible + mutation-quiescence",
@@ -127,10 +107,6 @@ async function waitForMeaningfulReadiness(page) {
     quiescence_elapsed_ms: quiescence.elapsed_ms,
     total_elapsed_ms: Date.now() - started
   };
-}
-
-function uniqueStrings(values, max = 80) {
-  return [...new Set(values.filter(Boolean))].slice(0, max);
 }
 
 async function inspectViewport(browser, url, name, artifactRoot) {
@@ -162,16 +138,10 @@ async function inspectViewport(browser, url, name, artifactRoot) {
   });
   page.on("pageerror", (error) => pageErrors.push(sanitizeEvidenceText(error.message)));
   page.on("requestfailed", (request) => {
-    const failure = request.failure();
-    requestFailures.push({
-      url: sanitizeUrlForEvidence(request.url()),
-      error: sanitizeEvidenceText(failure?.errorText || "unknown", 240)
-    });
+    requestFailures.push({ url: sanitizeUrlForEvidence(request.url()), error: sanitizeEvidenceText(request.failure()?.errorText || "unknown", 240) });
   });
   page.on("request", (request) => {
-    if (url.startsWith("https://") && request.url().startsWith("http://")) {
-      mixedContentRequests.push(sanitizeUrlForEvidence(request.url()));
-    }
+    if (url.startsWith("https://") && request.url().startsWith("http://")) mixedContentRequests.push(sanitizeUrlForEvidence(request.url()));
   });
 
   let mainResponse;
@@ -179,12 +149,8 @@ async function inspectViewport(browser, url, name, artifactRoot) {
   let dom;
   let readiness;
   try {
-    mainResponse = await page.goto(url, {
-      waitUntil: BROWSER_CONFIG.waitUntil,
-      timeout: BROWSER_CONFIG.navigationTimeoutMs
-    });
+    mainResponse = await page.goto(url, { waitUntil: BROWSER_CONFIG.waitUntil, timeout: BROWSER_CONFIG.navigationTimeoutMs });
     readiness = await waitForMeaningfulReadiness(page);
-
     dom = await page.evaluate(() => {
       const navigation = performance.getEntriesByType("navigation")[0];
       const html = document.documentElement;
@@ -201,18 +167,20 @@ async function inspectViewport(browser, url, name, artifactRoot) {
           parsed.search = "";
           parsed.hash = "";
           return parsed.href;
-        } catch {
-          return null;
-        }
+        } catch { return null; }
       };
+      let queryInternalLinkCount = 0;
       const internalLinks = anchors.map((node) => {
         try {
           const parsed = new URL(node.href, location.href);
           if (parsed.hostname !== baseHost || !/^https?:$/.test(parsed.protocol)) return null;
-          return safeUrl(parsed.href);
-        } catch {
-          return null;
-        }
+          if (parsed.search) {
+            queryInternalLinkCount += 1;
+            return null;
+          }
+          parsed.hash = "";
+          return parsed.href;
+        } catch { return null; }
       }).filter(Boolean);
       const inventory = {
         links: anchors.slice(0, 30).map((node) => ({
@@ -247,6 +215,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
         missing_alt_attribute_count: images.filter((node) => !node.hasAttribute("alt")).length,
         interactive_count: document.querySelectorAll("a,button,input,select,textarea,[tabindex]").length,
         internal_links: [...new Set(internalLinks)].slice(0, 80),
+        internal_links_with_query_count: queryInternalLinkCount,
         inventory,
         navigation_timing: navigation ? {
           ttfb_ms: Math.round(navigation.responseStart - navigation.requestStart),
@@ -260,12 +229,10 @@ async function inspectViewport(browser, url, name, artifactRoot) {
 
     await page.addScriptTag({ content: axeSource });
     axeFull = await page.evaluate(async () => globalThis.axe.run(document));
-
     await fs.mkdir(path.join(artifactRoot, baseDir), { recursive: true });
     await page.screenshot({ path: path.join(artifactRoot, screenshotRelative), fullPage: true });
     await writeJsonArtifact(artifactRoot, axeRelative, axeFull);
     await writeJsonArtifact(artifactRoot, domRelative, { readiness, dom });
-
     artifactEntries.push(await describeArtifact(artifactRoot, screenshotRelative, "screenshot", `${name} full-page screenshot`));
     artifactEntries.push(await describeArtifact(artifactRoot, axeRelative, "report", `${name} volledige axe JSON`));
     artifactEntries.push(await describeArtifact(artifactRoot, domRelative, "report", `${name} DOM/readiness inventaris`));
@@ -306,7 +273,12 @@ async function inspectViewport(browser, url, name, artifactRoot) {
 
 export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoot = "artifacts/latest") {
   const target = await assertPublicUrl(rawUrl, { allowQuery: false });
-  const browser = await chromium.launch({ headless: true });
+  const proxy = await startPublicNetworkProxy();
+  const browser = await chromium.launch({
+    headless: true,
+    proxy: { server: proxy.url },
+    args: ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp", "--disable-quic"]
+  });
   try {
     const names = level === "quick" ? ["desktop"] : ["desktop", "mobile"];
     const runs = [];
@@ -314,25 +286,20 @@ export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoo
       try {
         runs.push(await inspectViewport(browser, target.href, name, artifactRoot));
       } catch (error) {
-        runs.push({
-          viewport: name,
-          viewport_size: VIEWPORTS[name],
-          browser_error: sanitizeEvidenceText(error instanceof Error ? error.message : String(error)),
-          artifact_entries: []
-        });
+        runs.push({ viewport: name, viewport_size: VIEWPORTS[name], browser_error: sanitizeEvidenceText(error instanceof Error ? error.message : String(error)), artifact_entries: [] });
       }
     }
-
     return {
       tool: "playwright+axe-core",
       tool_versions: { playwright: playwrightVersion, axe_core: axeVersion },
       browser: "chromium",
       browser_configuration: BROWSER_CONFIG,
       viewports: VIEWPORTS,
-      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. Service Workers en WebSocket-egress zijn geblokkeerd zodat netwerkinterceptie fail-closed blijft. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
+      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. HTTP(S)-egress gaat via een lokale DNS-pinning proxy; Service Workers, WebSocket-egress, non-proxied WebRTC UDP en QUIC zijn geblokkeerd. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
       runs
     };
   } finally {
     await browser.close();
+    await proxy.close();
   }
 }
