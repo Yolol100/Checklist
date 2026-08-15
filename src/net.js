@@ -3,45 +3,50 @@ import net from "node:net";
 
 const BLOCKED_HOST_SUFFIXES = [".local", ".localhost", ".internal", ".lan", ".home"];
 
-function isPrivateIpv4(address) {
-  const parts = address.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
-  const [a, b, c] = parts;
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 0 && c === 0) ||
-    (a === 192 && b === 0 && c === 2) ||
-    (a === 192 && b === 168) ||
-    (a === 198 && (b === 18 || b === 19)) ||
-    (a === 198 && b === 51 && c === 100) ||
-    (a === 203 && b === 0 && c === 113) ||
-    a >= 224
-  );
-}
+const IPV4_BLOCKLIST = new net.BlockList();
+for (const [network, prefix] of [
+  ["0.0.0.0", 8],
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10],
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16],
+  ["172.16.0.0", 12],
+  ["192.0.0.0", 24],
+  ["192.0.2.0", 24],
+  ["192.88.99.0", 24],
+  ["192.168.0.0", 16],
+  ["198.18.0.0", 15],
+  ["198.51.100.0", 24],
+  ["203.0.113.0", 24],
+  ["224.0.0.0", 3]
+]) IPV4_BLOCKLIST.addSubnet(network, prefix, "ipv4");
 
-function isPrivateIpv6(address) {
-  const value = address.toLowerCase().split("%")[0];
-  if (value === "::" || value === "::1") return true;
-  if (value.startsWith("fc") || value.startsWith("fd")) return true;
-  if (/^fe[89ab]/.test(value)) return true;
-  if (value.startsWith("ff")) return true;
-  if (value.startsWith("2001:db8")) return true;
-  if (value.startsWith("::ffff:")) {
-    const mapped = value.slice("::ffff:".length);
-    return net.isIP(mapped) === 4 ? isPrivateIpv4(mapped) : true;
-  }
-  return false;
-}
+const IPV6_BLOCKLIST = new net.BlockList();
+for (const [network, prefix] of [
+  ["::", 128],
+  ["::1", 128],
+  ["::ffff:0:0", 96],
+  ["64:ff9b::", 96],
+  ["64:ff9b:1::", 48],
+  ["100::", 64],
+  ["100:0:0:1::", 64],
+  ["2001::", 32],
+  ["2001:2::", 48],
+  ["2001:10::", 28],
+  ["2001:db8::", 32],
+  ["2002::", 16],
+  ["3fff::", 20],
+  ["5f00::", 16],
+  ["fc00::", 7],
+  ["fe00::", 8],
+  ["ff00::", 8]
+]) IPV6_BLOCKLIST.addSubnet(network, prefix, "ipv6");
 
 export function isPrivateIp(address) {
-  const version = net.isIP(address);
-  if (version === 4) return isPrivateIpv4(address);
-  if (version === 6) return isPrivateIpv6(address);
+  const clean = String(address).toLowerCase().split("%")[0];
+  const version = net.isIP(clean);
+  if (version === 4) return IPV4_BLOCKLIST.check(clean, "ipv4");
+  if (version === 6) return IPV6_BLOCKLIST.check(clean, "ipv6");
   return true;
 }
 
