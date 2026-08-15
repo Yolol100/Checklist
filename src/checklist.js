@@ -405,11 +405,12 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
   let robots = null;
   if (level !== "quick") {
     const baseHost = new URL(finalUrl).hostname;
+    const renderedLinksAvailable = Boolean(renderedDom);
     const renderedLinks = renderedDom?.internal_links || [];
     const serverLinks = [...html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>/gi)]
       .map((match) => absoluteUrl(match[1], finalUrl))
       .filter((url) => url && new URL(url).hostname === baseHost);
-    const candidateLinks = renderedLinks.length ? renderedLinks : serverLinks;
+    const candidateLinks = renderedLinksAvailable ? renderedLinks : serverLinks;
     const uniqueLinks = [...new Set(candidateLinks)].slice(0, level === "full" ? 60 : 20);
     linkResults = await Promise.all(uniqueLinks.map((url) => checkLink(url)));
     const broken = linkResults.filter((item) => !item.ok);
@@ -423,9 +424,9 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
         tested_count: linkResults.length,
         broken_count: broken.length,
         broken: broken.slice(0, 20),
-        basis: renderedLinks.length ? "rendered_dom" : "server_html_fallback"
+        basis: renderedLinksAvailable ? "rendered_dom" : "server_html_fallback"
       },
-      evidenceIds: renderedLinks.length ? ["EV-BROWSER-DESKTOP", "EV-LINK-SAMPLE"] : ["EV-LINK-SAMPLE"]
+      evidenceIds: renderedLinksAvailable ? ["EV-BROWSER-DESKTOP", "EV-LINK-SAMPLE"] : ["EV-LINK-SAMPLE"]
     }));
 
     robots = await collectRobots(finalUrl);

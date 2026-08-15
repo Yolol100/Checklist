@@ -184,26 +184,119 @@ function buildEvidenceRegistry(result, runId) {
   return registry;
 }
 
+function selectedHeaders(headers = {}) {
+  const keys = [
+    "cache-control",
+    "content-security-policy",
+    "content-type",
+    "permissions-policy",
+    "referrer-policy",
+    "strict-transport-security",
+    "x-content-type-options"
+  ];
+  return Object.fromEntries(keys.map((key) => [key, headers[key] ?? null]));
+}
+
+function stableLinkSample(items = []) {
+  return items
+    .map((item) => ({
+      url: item.url || null,
+      final_url: item.final_url || null,
+      status: item.status ?? null,
+      ok: Boolean(item.ok),
+      error: item.error || null
+    }))
+    .sort((a, b) => String(a.url).localeCompare(String(b.url)));
+}
+
+function stableRobots(robots) {
+  if (!robots) return null;
+  return {
+    url: robots.url || null,
+    status_code: robots.status_code ?? null,
+    sitemap_directives: [...(robots.sitemap_directives || [])].sort(),
+    blocks_all: Boolean(robots.blocks_all),
+    error: robots.error || null
+  };
+}
+
+function stableDom(dom) {
+  if (!dom) return null;
+  return {
+    document_ready_state: dom.document_ready_state || null,
+    title: dom.title || null,
+    description: dom.description || null,
+    lang: dom.lang || null,
+    viewport_meta: dom.viewport_meta || null,
+    canonical: dom.canonical || null,
+    robots_meta: dom.robots_meta || null,
+    h1_count: dom.h1_count ?? null,
+    form_count: dom.form_count ?? null,
+    image_count: dom.image_count ?? null,
+    missing_alt_attribute_count: dom.missing_alt_attribute_count ?? null,
+    interactive_count: dom.interactive_count ?? null,
+    internal_links: [...(dom.internal_links || [])].sort(),
+    inventory: dom.inventory || null
+  };
+}
+
+function stableAxe(axe) {
+  if (!axe) return null;
+  return {
+    violation_count: axe.violation_count ?? null,
+    serious_or_critical_count: axe.serious_or_critical_count ?? null,
+    incomplete: axe.incomplete ?? null,
+    violations: (axe.violations || []).map((item) => ({
+      id: item.id,
+      impact: item.impact || null,
+      node_count: item.node_count ?? null,
+      targets: item.targets || []
+    }))
+  };
+}
+
+function stableBrowserRuns(runs = []) {
+  return runs
+    .map((run) => {
+      if (run.browser_error) {
+        return {
+          viewport: run.viewport,
+          browser_error: run.browser_error
+        };
+      }
+      return {
+        viewport: run.viewport,
+        viewport_size: run.viewport_size || null,
+        status_code: run.status_code ?? null,
+        final_url: run.final_url || null,
+        readiness: run.readiness ? {
+          body_visible: Boolean(run.readiness.body_visible),
+          strategy: run.readiness.strategy || null,
+          quiescence_reason: run.readiness.quiescence_reason || null
+        } : null,
+        dom: stableDom(run.dom),
+        axe: stableAxe(run.axe),
+        console_errors: run.console_errors || [],
+        page_errors: run.page_errors || [],
+        request_failures: run.request_failures || [],
+        mixed_content_requests: [...(run.mixed_content_requests || [])].sort()
+      };
+    })
+    .sort((a, b) => String(a.viewport).localeCompare(String(b.viewport)));
+}
+
 function artifactFingerprint(result) {
-  const desktop = result.browser_evidence?.runs?.find((run) => run.viewport === "desktop" && !run.browser_error);
-  const dom = desktop?.dom;
   return sha256Json({
     final_url: result.final_url,
-    status_code: result.network_evidence.main_response.status_code,
-    content_type: result.network_evidence.main_response.content_type,
-    rendered_state: dom ? {
-      title: dom.title,
-      description: dom.description,
-      lang: dom.lang,
-      viewport_meta: dom.viewport_meta,
-      canonical: dom.canonical,
-      robots_meta: dom.robots_meta,
-      h1_count: dom.h1_count,
-      form_count: dom.form_count,
-      image_count: dom.image_count,
-      missing_alt_attribute_count: dom.missing_alt_attribute_count,
-      internal_links: dom.internal_links
-    } : null
+    main_response: {
+      status_code: result.network_evidence.main_response.status_code,
+      content_type: result.network_evidence.main_response.content_type,
+      redirect_chain: result.network_evidence.main_response.redirect_chain || [],
+      headers: selectedHeaders(result.network_evidence.main_response.headers)
+    },
+    link_sample: stableLinkSample(result.network_evidence.link_sample),
+    robots: stableRobots(result.network_evidence.robots),
+    browser_runs: stableBrowserRuns(result.browser_evidence?.runs)
   });
 }
 

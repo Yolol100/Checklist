@@ -158,6 +158,7 @@ if (data.evidence_level === "browser_at") {
 
 if (data.release_decision === "go") {
   check(levelAtLeast(data.evidence_level, "staging"), "go vereist staging of hoger evidence level");
+  check(capabilities.staging_access === true, "go vereist aantoonbare staging_access; production_observation vervangt verplichte staging niet");
   check(coverage === 100, "go vereist 100% required runtime coverage");
   check(openCriticalHigh.length === 0, "go kan geen open critical/high finding hebben");
   check(data.unexecuted_tests.length === 0, "go kan geen onuitgevoerde in-scope tests hebben");
