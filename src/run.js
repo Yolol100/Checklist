@@ -33,6 +33,25 @@ function sanitizeResultForPublicJson(result) {
     const header = item.data?.header;
     item.data = { header, present: Boolean(header && rawHeaders[header]) };
   }
+
+  const sample = result.network_evidence?.link_sample || [];
+  const queryRejected = sample.filter((item) => /queryparameters/i.test(item.error || ""));
+  if (queryRejected.length) result.network_evidence.link_sample = sample.filter((item) => !queryRejected.includes(item));
+  const linkObservation = result.observations?.find((item) => item.id === "LINK-001");
+  if (linkObservation) {
+    const kept = result.network_evidence?.link_sample || [];
+    const broken = kept.filter((item) => !item.ok);
+    const renderedQueryCount = result.browser_evidence?.runs?.find((run) => run.viewport === "desktop" && !run.browser_error)?.dom?.internal_links_with_query_count || 0;
+    linkObservation.outcome = broken.length ? OUTCOME.ISSUE : OUTCOME.OK;
+    linkObservation.data = {
+      ...linkObservation.data,
+      tested_count: kept.length,
+      broken_count: broken.length,
+      broken: broken.slice(0, 20),
+      skipped_query_count: renderedQueryCount + queryRejected.length
+    };
+    linkObservation.note = "Automatische linkprobes volgen geen query-URL's; zulke links worden als overgeslagen gerapporteerd en niet als kapot. Query-specifiek routegedrag vereist aparte veilige evidence.";
+  }
   return result;
 }
 
@@ -45,13 +64,8 @@ function buildEvidenceRegistry(result, runId, targetEnvironment) {
     environment, scope: result.final_url, evidence_level: externalLevel, execution_mode: "synthetic",
     sha256: sha256Json(result.network_evidence.main_response)
   }];
-
-  if (result.observations.some((item) => item.id === "LINK-001")) {
-    registry.push({ id: "EV-LINK-SAMPLE", type: "report", source: "runtime:internal-link-sample", created_at: createdAt, environment, scope: result.final_url, evidence_level: externalLevel, execution_mode: "synthetic", sha256: sha256Json(result.network_evidence.link_sample) });
-  }
-  if (result.network_evidence.robots) {
-    registry.push({ id: "EV-ROBOTS", type: "response", source: "runtime:robots.txt", created_at: createdAt, environment, scope: result.network_evidence.robots.url, evidence_level: externalLevel, execution_mode: "synthetic", sha256: sha256Json(result.network_evidence.robots) });
-  }
+  if (result.observations.some((item) => item.id === "LINK-001")) registry.push({ id: "EV-LINK-SAMPLE", type: "report", source: "runtime:internal-link-sample", created_at: createdAt, environment, scope: result.final_url, evidence_level: externalLevel, execution_mode: "synthetic", sha256: sha256Json(result.network_evidence.link_sample) });
+  if (result.network_evidence.robots) registry.push({ id: "EV-ROBOTS", type: "response", source: "runtime:robots.txt", created_at: createdAt, environment, scope: result.network_evidence.robots.url, evidence_level: externalLevel, execution_mode: "synthetic", sha256: sha256Json(result.network_evidence.robots) });
 
   for (const run of result.browser_evidence?.runs || []) {
     if (run.browser_error) continue;
@@ -140,18 +154,11 @@ const payload = {
   request: { request_id: request.request_id, url: target.href, level: request.level, task_type: request.task_type, target_environment: request.target_environment, requested_at: request.requested_at || null, requested_by: request.requested_by || "ChatGPT" },
   source_context: request.source_context,
   runner: { name: result.runner, version: result.runner_version, contract: result.contract, mutation_performed: result.mutation_performed },
-  target: result.target,
-  final_url: result.final_url,
-  started_at: result.started_at,
-  completed_at: result.completed_at,
+  target: result.target, final_url: result.final_url, started_at: result.started_at, completed_at: result.completed_at,
   configuration_hash: sha256Json({ level: request.level, task_type: request.task_type, target_environment: request.target_environment, source_context: request.source_context }),
   artifact_fingerprint_sha256: artifactFingerprint(result),
-  tool_versions: result.browser_evidence?.tool_versions || {},
-  runtime_observation: result.runtime_observation,
-  evidence_registry: evidenceRegistry,
-  observations: result.observations,
-  unexecuted_tests: unexecutedTests,
-  limitations: result.limitations,
+  tool_versions: result.browser_evidence?.tool_versions || {}, runtime_observation: result.runtime_observation,
+  evidence_registry: evidenceRegistry, observations: result.observations, unexecuted_tests: unexecutedTests, limitations: result.limitations,
   policy_evaluation: null,
   final_evidence_contract: {
     owner: "website-qa-checklist", policy_input: "policy/queue/<evaluation_id>.json", output: "results/formal/<evaluation_id>.json",
