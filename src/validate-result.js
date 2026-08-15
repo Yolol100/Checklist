@@ -40,6 +40,14 @@ requireCondition(payload.final_evidence_contract?.runtime_schema === "support/84
 requireCondition(payload.final_evidence_contract?.policy_input === "policy/queue/<evaluation_id>.json", "policy input-contract ontbreekt");
 requireCondition(payload.final_evidence_contract?.output === "results/formal/<evaluation_id>.json", "formal output-contract ontbreekt");
 
+const storedHeaders = payload.network_evidence?.main_response?.headers || {};
+for (const forbidden of ["set-cookie", "cookie", "authorization", "proxy-authorization", "www-authenticate"]) {
+  requireCondition(!Object.hasOwn(storedHeaders, forbidden), `publieke raw evidence bevat verboden responseheader ${forbidden}`);
+}
+for (const presenceOnly of ["content-security-policy", "content-security-policy-report-only"]) {
+  if (Object.hasOwn(storedHeaders, presenceOnly)) requireCondition(storedHeaders[presenceOnly] === "[present]", `${presenceOnly} moet presence-only worden opgeslagen`);
+}
+
 const evidenceIds = new Set();
 for (const evidence of payload.evidence_registry || []) {
   requireCondition(typeof evidence.id === "string" && evidence.id.length >= 3, "evidence-id ontbreekt");
@@ -48,9 +56,7 @@ for (const evidence of payload.evidence_registry || []) {
   if (evidence.sha256 !== null && evidence.sha256 !== undefined) requireCondition(HEX64.test(evidence.sha256), `evidence ${evidence.id} heeft ongeldige sha256`);
   requireCondition(["production_observation", "controlled_runtime", "staging", "browser_at", "source"].includes(evidence.evidence_level), `evidence ${evidence.id} heeft ongeldige evidence_level`);
   requireCondition(["real", "emulated", "synthetic", "not_executed"].includes(evidence.execution_mode), `evidence ${evidence.id} heeft ongeldige execution_mode`);
-  if (payload.request.target_environment !== "production") {
-    requireCondition(evidence.evidence_level !== "production_observation", `evidence ${evidence.id} mag voor ${payload.request.target_environment} geen production_observation zijn`);
-  }
+  if (payload.request.target_environment !== "production") requireCondition(evidence.evidence_level !== "production_observation", `evidence ${evidence.id} mag voor ${payload.request.target_environment} geen production_observation zijn`);
 }
 
 for (const item of payload.observations || []) {
@@ -66,8 +72,18 @@ for (const item of browserEvidence) requireCondition(item.evidence_level === "co
 const mobile = payload.evidence_registry.find((item) => item.id === "EV-BROWSER-MOBILE");
 if (mobile) requireCondition(mobile.execution_mode === "emulated", "EV-BROWSER-MOBILE moet emulated zijn");
 
+if (browserEvidence.length) {
+  const mutationGuard = payload.observations.find((item) => item.id === "RUNTIME-MUTATION-GUARD");
+  requireCondition(Boolean(mutationGuard), "RUNTIME-MUTATION-GUARD ontbreekt ondanks browserevidence");
+  requireCondition(JSON.stringify(mutationGuard?.data?.allowed_methods) === JSON.stringify(["GET", "HEAD"]), "mutation guard moet alleen GET/HEAD toestaan");
+  for (const run of payload.browser_evidence?.runs || []) {
+    for (const item of run.blocked_write_requests || []) requireCondition(!["GET", "HEAD"].includes(item.method), `blocked_write_requests bevat onverwachte safe method ${item.method}`);
+  }
+}
+
 requireCondition(!/[?&](?:access_token|id_token|api[_-]?key|token|secret)=/i.test(rawText), "raw evidence bevat een query-secretpatroon");
 requireCondition(!/Bearer\s+[A-Za-z0-9._~+\/-]{12,}/i.test(rawText), "raw evidence bevat een Bearer-tokenpatroon");
+requireCondition(!/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(rawText), "raw evidence bevat een e-mailadres");
 
 if (errors.length) {
   console.error("Resultaatvalidatie mislukt:");
