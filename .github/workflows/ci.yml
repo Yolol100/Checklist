@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "build/**"]
+    branches: [main, "build/**", "agent/**"]
   pull_request:
 
 jobs:
@@ -20,5 +20,15 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Syntax check
         run: npm run check
-      - name: Smoke test runner
+      - name: Smoke test evidence runner
         run: npm run scan
+      - name: Validate raw evidence contract
+        run: npm run validate-result
+      - name: Verify reproducibility artifacts
+        run: |
+          test -f artifacts/latest/browser/desktop/page.png
+          test -f artifacts/latest/browser/desktop/axe.json
+          test -f artifacts/latest/browser/desktop/trace.zip
+          test -f artifacts/latest/browser/mobile/page.png
+          test -f artifacts/latest/browser/mobile/axe.json
+          test -f artifacts/latest/browser/mobile/trace.zip
