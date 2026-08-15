@@ -2,3 +2,9 @@ node_modules/
 .env
 .DS_Store
 npm-debug.log*
+artifacts/
+results/latest.json
+results/formal-latest.json
+results/formal-*.json
+results/runs/ci-*.json
+policy/*-ci.json

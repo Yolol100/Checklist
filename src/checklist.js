@@ -1,5 +1,7 @@
 import { runBrowserEvidence } from "./browser.js";
+import { mapWithConcurrency } from "./concurrency.js";
 import { assertPublicUrl, readTextLimited, safeFetch } from "./net.js";
+import { sanitizeEvidenceText, sanitizeUrlForEvidence } from "./privacy.js";
 
 export const OUTCOME = {
   OK: "observed_ok",
@@ -57,7 +59,7 @@ function findCanonical(html, base) {
     const rel = extractAttribute(tag, "rel").toLowerCase().split(/\s+/);
     if (rel.includes("canonical")) {
       const href = extractAttribute(tag, "href");
-      try { return href ? new URL(href, base).href : null; } catch { return null; }
+      try { return href ? sanitizeUrlForEvidence(new URL(href, base)) : null; } catch { return null; }
     }
   }
   return null;
@@ -76,13 +78,23 @@ function absoluteUrl(href, base) {
 
 async function checkLink(url, timeoutMs = 7000) {
   try {
-    let result = await safeFetch(url, { method: "HEAD", timeoutMs, headers: { "user-agent": "Webactueel-Checklist-QA/0.5 (+read-only evidence runner)" } });
+    let result = await safeFetch(url, { method: "HEAD", timeoutMs, headers: { "user-agent": "Webactueel-Checklist-QA/0.6 (+read-only evidence runner)" } });
     if (result.response.status === 405 || result.response.status === 403) {
-      result = await safeFetch(url, { method: "GET", timeoutMs, headers: { "user-agent": "Webactueel-Checklist-QA/0.5 (+read-only evidence runner)" } });
+      result = await safeFetch(url, { method: "GET", timeoutMs, headers: { "user-agent": "Webactueel-Checklist-QA/0.6 (+read-only evidence runner)" } });
     }
-    return { url, final_url: result.finalUrl, status: result.response.status, ok: result.response.status < 400 };
+    return {
+      url: sanitizeUrlForEvidence(url),
+      final_url: sanitizeUrlForEvidence(result.finalUrl),
+      status: result.response.status,
+      ok: result.response.status < 400
+    };
   } catch (error) {
-    return { url, status: null, ok: false, error: error instanceof Error ? error.message : String(error) };
+    return {
+      url: sanitizeUrlForEvidence(url),
+      status: null,
+      ok: false,
+      error: sanitizeEvidenceText(error instanceof Error ? error.message : String(error), 240)
+    };
   }
 }
 
@@ -92,17 +104,21 @@ async function collectRobots(finalUrl) {
     const { response, finalUrl: observedUrl } = await safeFetch(robotsUrl, {
       method: "GET",
       timeoutMs: 8000,
-      headers: { "user-agent": "Webactueel-Checklist-QA/0.5 (+read-only evidence runner)" }
+      headers: { "user-agent": "Webactueel-Checklist-QA/0.6 (+read-only evidence runner)" }
     });
     const text = response.status === 200 ? await readTextLimited(response, 250_000) : "";
     return {
-      url: observedUrl,
+      url: sanitizeUrlForEvidence(observedUrl),
       status_code: response.status,
-      sitemap_directives: text.split(/\r?\n/).filter((line) => /^\s*sitemap\s*:/i.test(line)).slice(0, 20),
+      sitemap_directives: text.split(/\r?\n/).filter((line) => /^\s*sitemap\s*:/i.test(line)).slice(0, 20).map((line) => sanitizeEvidenceText(line, 300)),
       blocks_all: /user-agent\s*:\s*\*[\s\S]{0,500}?disallow\s*:\s*\/\s*(?:\r?\n|$)/i.test(text)
     };
   } catch (error) {
-    return { url: robotsUrl.href, status_code: null, error: error instanceof Error ? error.message : String(error) };
+    return {
+      url: sanitizeUrlForEvidence(robotsUrl),
+      status_code: null,
+      error: sanitizeEvidenceText(error instanceof Error ? error.message : String(error), 240)
+    };
   }
 }
 
@@ -146,9 +162,7 @@ function browserObservations(browserEvidence, level) {
     category: "runtime",
     title: "Gerenderde UI-readiness vóór inspectie",
     outcome: readinessTimedOut ? OUTCOME.INTERPRET : OUTCOME.OK,
-    data: {
-      by_viewport: successful.map((run) => ({ viewport: run.viewport, readiness: run.readiness || null }))
-    },
+    data: { by_viewport: successful.map((run) => ({ viewport: run.viewport, readiness: run.readiness || null })) },
     evidenceIds: successful.flatMap((run) => evidenceFor(run.viewport)),
     note: readinessTimedOut
       ? "Body was zichtbaar, maar mutation-quiescence bereikte de maximale wachttijd; interpreteer dynamische DOM-resultaten met die beperking."
@@ -212,6 +226,19 @@ function browserObservations(browserEvidence, level) {
     evidenceIds: successful.flatMap((run) => evidenceFor(run.viewport))
   }));
 
+  const websocketRequests = [...new Set(successful.flatMap((run) => run.websocket_requests || []))];
+  observations.push(observation({
+    id: "RUNTIME-WEBSOCKET-GUARD",
+    category: "runtime",
+    title: "WebSocket-egress tijdens browserrun",
+    outcome: websocketRequests.length ? OUTCOME.INTERPRET : OUTCOME.OK,
+    data: { blocked_count: websocketRequests.length, urls: websocketRequests.slice(0, 20) },
+    evidenceIds: successful.flatMap((run) => evidenceFor(run.viewport)),
+    note: websocketRequests.length
+      ? "WebSocketverbindingen zijn om veiligheidsredenen geblokkeerd; realtime gedrag dat hiervan afhankelijk is, is niet bewezen."
+      : "Geen WebSocket-egress geobserveerd; de guard bleef actief."
+  }));
+
   observations.push(observation({
     id: "PERF-LAB-OBS",
     category: "performance",
@@ -240,14 +267,14 @@ function renderedDesktop(browserEvidence) {
   return browserEvidence?.runs?.find((run) => run.viewport === "desktop" && !run.browser_error && run.dom) || null;
 }
 
-export async function runChecklist(rawUrl, level = "standard", artifactRoot = "artifacts/latest") {
+export async function runChecklist(rawUrl, level = "standard", artifactRoot = "artifacts/latest", targetEnvironment = "public_test") {
   const startedAt = new Date().toISOString();
   const target = await assertPublicUrl(rawUrl, { allowQuery: false });
   const { response, finalUrl, redirectChain } = await safeFetch(target, {
     method: "GET",
     allowQuery: false,
     timeoutMs: 15_000,
-    headers: { "user-agent": "Webactueel-Checklist-QA/0.5 (+read-only evidence runner)" }
+    headers: { "user-agent": "Webactueel-Checklist-QA/0.6 (+read-only evidence runner)" }
   });
 
   const contentType = response.headers.get("content-type") || "";
@@ -260,7 +287,7 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
     category: "bereikbaarheid",
     title: "Publieke pagina bereikbaar",
     outcome: response.ok ? OUTCOME.OK : OUTCOME.ISSUE,
-    data: { requested_url: target.href, final_url: finalUrl, status_code: response.status, redirect_chain: redirectChain },
+    data: { requested_url: sanitizeUrlForEvidence(target), final_url: sanitizeUrlForEvidence(finalUrl), status_code: response.status, redirect_chain: redirectChain.map((item) => ({ ...item, from: sanitizeUrlForEvidence(item.from), to: sanitizeUrlForEvidence(item.to) })) },
     evidenceIds: ["EV-HTTP-MAIN"]
   }));
 
@@ -278,7 +305,7 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
     category: "security",
     title: "Eind-URL gebruikt HTTPS",
     outcome: finalUrl.startsWith("https://") ? OUTCOME.OK : OUTCOME.ISSUE,
-    data: { final_url: finalUrl },
+    data: { final_url: sanitizeUrlForEvidence(finalUrl) },
     evidenceIds: ["EV-HTTP-MAIN"]
   }));
 
@@ -307,7 +334,7 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
     browserEvidence = await runBrowserEvidence(finalUrl, level, artifactRoot);
     observations.push(...browserObservations(browserEvidence, level));
   } catch (error) {
-    browserEvidence = { error: error instanceof Error ? error.message : String(error), runs: [] };
+    browserEvidence = { error: sanitizeEvidenceText(error instanceof Error ? error.message : String(error)), runs: [] };
     observations.push(observation({
       id: "RUNTIME-BROWSER",
       category: "runtime",
@@ -363,7 +390,7 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
     outcome: canonical ? OUTCOME.OK : OUTCOME.INTERPRET,
     data: { canonical, basis: domBasis },
     evidenceIds: domEvidenceIds,
-    note: "Afwezigheid is niet automatisch een fout; de SEO-bron bepaalt de verwachting voor deze URL."
+    note: "Afwezigheid is niet automatisch een fout; de SEO-bron bepaalt de verwachting voor deze URL. Queryparameters worden in publieke evidence verwijderd."
   }));
 
   const h1Count = renderedDom?.h1_count ?? countMatches(html, /<h1\b[^>]*>/gi);
@@ -412,7 +439,7 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
       .filter((url) => url && new URL(url).hostname === baseHost);
     const candidateLinks = renderedLinksAvailable ? renderedLinks : serverLinks;
     const uniqueLinks = [...new Set(candidateLinks)].slice(0, level === "full" ? 60 : 20);
-    linkResults = await Promise.all(uniqueLinks.map((url) => checkLink(url)));
+    linkResults = await mapWithConcurrency(uniqueLinks, 6, (url) => checkLink(url));
     const broken = linkResults.filter((item) => !item.ok);
 
     observations.push(observation({
@@ -424,17 +451,20 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
         tested_count: linkResults.length,
         broken_count: broken.length,
         broken: broken.slice(0, 20),
+        concurrency_limit: 6,
         basis: renderedLinksAvailable ? "rendered_dom" : "server_html_fallback"
       },
-      evidenceIds: renderedLinksAvailable ? ["EV-BROWSER-DESKTOP", "EV-LINK-SAMPLE"] : ["EV-LINK-SAMPLE"]
+      evidenceIds: renderedLinksAvailable ? ["EV-BROWSER-DESKTOP", "EV-LINK-SAMPLE"] : ["EV-LINK-SAMPLE"],
+      note: "Queryparameters worden uit publieke evidence verwijderd; query-specifiek routegedrag is daarmee niet volledig bewezen."
     }));
 
     robots = await collectRobots(finalUrl);
+    const robotsNeedsInterpretation = robots.blocks_all || !robots.status_code || robots.status_code >= 500 || [401, 403].includes(robots.status_code);
     observations.push(observation({
       id: "SEO-ROBOTS",
       category: "seo",
       title: "robots.txt observatie",
-      outcome: robots.blocks_all || !robots.status_code || robots.status_code >= 500 ? OUTCOME.INTERPRET : OUTCOME.OK,
+      outcome: robotsNeedsInterpretation ? OUTCOME.INTERPRET : OUTCOME.OK,
       data: robots,
       evidenceIds: ["EV-ROBOTS"]
     }));
@@ -469,24 +499,30 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
 
   return {
     runner: "webactueel-checklist-qa",
-    runner_version: "0.5.0",
+    runner_version: "0.6.0",
     contract: "raw-evidence-v1",
     level,
-    target: target.href,
-    final_url: finalUrl,
+    target: sanitizeUrlForEvidence(target),
+    final_url: sanitizeUrlForEvidence(finalUrl),
     started_at: startedAt,
     completed_at: new Date().toISOString(),
     mutation_performed: false,
     runtime_observation: {
       host: "github-actions",
       public_read_only: true,
-      network_target: "public-production-url",
+      target_environment: targetEnvironment,
+      network_target: targetEnvironment,
       browser_harness: Boolean(browserEvidence?.tool_versions),
       browser_evidence: browserEvidence?.tool_versions || null,
       browser_configuration: browserEvidence?.browser_configuration || null
     },
     network_evidence: {
-      main_response: { status_code: response.status, content_type: contentType || null, headers, redirect_chain: redirectChain },
+      main_response: {
+        status_code: response.status,
+        content_type: contentType || null,
+        headers,
+        redirect_chain: redirectChain.map((item) => ({ ...item, from: sanitizeUrlForEvidence(item.from), to: sanitizeUrlForEvidence(item.to) }))
+      },
       link_sample: linkResults,
       robots
     },
@@ -497,6 +533,8 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
       "Geen formele WCAG-conformiteitsclaim.",
       "Axe automatiseert slechts een deel van toegankelijkheid; keyboard, zoom en screenreader zijn aparte tests.",
       "Mobiele Chromium-emulatie is geen echt-device- of echte Safari/iOS-evidence.",
+      "Service Workers en WebSocket-egress zijn geblokkeerd; sites die hiervan afhankelijk zijn kunnen aanvullende browser-evidence vereisen.",
+      "Queryparameters worden uit repository-evidence verwijderd; query-specifiek routegedrag is niet volledig bewezen.",
       "Geen formulierinzendingen, betalingen, orders of andere writes.",
       "Synthetische browser-timing vervangt geen echte Core Web Vitals-velddata.",
       "De runner kent geen QA-prioriteit of releasebesluit toe; de Website QA Skill en actieve Drive-bronnen doen dat."

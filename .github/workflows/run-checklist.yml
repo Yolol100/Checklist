@@ -5,54 +5,86 @@ on:
     branches:
       - main
     paths:
-      - requests/current.json
+      - "requests/queue/*.json"
 
 permissions:
   contents: write
 
-concurrency:
-  group: checklist-run
-  cancel-in-progress: true
-
 jobs:
   checklist:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
 
+      - name: Identify immutable request
+        id: request
+        shell: bash
+        run: |
+          TOTAL_FILES="$(git show --pretty='' --name-only "$GITHUB_SHA" | sed '/^$/d' | wc -l | tr -d ' ')"
+          mapfile -t FILES < <(git show --pretty='' --name-only "$GITHUB_SHA" | grep -E '^requests/queue/[A-Za-z0-9._-]+\.json$' || true)
+          if [ "$TOTAL_FILES" -ne 1 ] || [ "${#FILES[@]}" -ne 1 ]; then
+            echo "Trigger commit must contain exactly one queue request and no other changes; total=$TOTAL_FILES queue=${#FILES[@]}." >&2
+            exit 1
+          fi
+          REQUEST_PATH="${FILES[0]}"
+          REQUEST_ID="$(node -e 'const fs=require("fs"); const p=process.argv[1]; const r=JSON.parse(fs.readFileSync(p,"utf8")); process.stdout.write(String(r.request_id||""));' "$REQUEST_PATH")"
+          if ! [[ "$REQUEST_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$ ]]; then
+            echo "Invalid request_id." >&2
+            exit 1
+          fi
+          if [ "$(basename "$REQUEST_PATH" .json)" != "$REQUEST_ID" ]; then
+            echo "Queue filename must equal request_id." >&2
+            exit 1
+          fi
+          if [ -e "results/runs/$REQUEST_ID.json" ]; then
+            echo "Immutable result already exists for $REQUEST_ID." >&2
+            exit 1
+          fi
+          echo "request_path=$REQUEST_PATH" >> "$GITHUB_OUTPUT"
+          echo "request_id=$REQUEST_ID" >> "$GITHUB_OUTPUT"
+
       - name: Install locked dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
 
       - name: Validate runner
         run: npm run check
 
       - name: Run checklist evidence collection
-        run: npm run scan
+        env:
+          CHECKLIST_PERSIST_BROWSER_ARTIFACTS: "0"
+        run: node src/run.js "${{ steps.request.outputs.request_path }}"
 
       - name: Validate raw evidence contract
-        run: npm run validate-result
+        run: node src/validate-result.js results/latest.json
 
-      - name: Save immutable run evidence and latest pointer
+      - name: Commit immutable raw result
+        shell: bash
         run: |
+          REQUEST_ID="${{ steps.request.outputs.request_id }}"
+          git restore results/latest.json || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add results/latest.json results/runs artifacts/runs
-          if git diff --cached --quiet; then
-            echo "No evidence changes to commit."
-          else
-            git commit -m "Update checklist raw evidence"
-            git push origin HEAD:main
-          fi
+          git add "results/runs/$REQUEST_ID.json"
+          git commit -m "Add checklist raw evidence $REQUEST_ID"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep $((attempt * 2))
+          done
+          echo "Could not publish immutable raw result after bounded retries." >&2
+          exit 1

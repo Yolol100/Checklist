@@ -5,60 +5,148 @@ on:
     branches: [main, "build/**", "agent/**"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
       - name: Install locked dependencies
-        run: npm ci --no-audit --no-fund
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Syntax check
         run: npm run check
+      - name: Adversarial unit and workflow tests
+        run: npm test
+      - name: Install Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
       - name: Smoke test raw evidence runner
+        env:
+          CHECKLIST_PERSIST_BROWSER_ARTIFACTS: "0"
         run: npm run scan
       - name: Validate raw evidence contract
         run: npm run validate-result
-      - name: Verify rendered DOM authority
+      - name: Verify public-test evidence is not mislabeled production
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const result = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
+          const http = result.evidence_registry.find((item) => item.id === 'EV-HTTP-MAIN');
+          if (result.request.target_environment !== 'public_test') throw new Error('CI fixture must remain public_test');
+          if (http?.evidence_level === 'production_observation') throw new Error('public_test target was incorrectly labeled production_observation');
+          NODE
+      - name: Verify rendered DOM authority and bounded probes
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const result = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
           const readiness = result.observations.find((item) => item.id === 'RUNTIME-UI-READINESS');
           const links = result.observations.find((item) => item.id === 'LINK-001');
+          const mutation = result.observations.find((item) => item.id === 'RUNTIME-MUTATION-GUARD');
           if (readiness?.outcome !== 'observed_ok') throw new Error('UI-readiness fixture is niet observed_ok');
           if (links?.data?.basis !== 'rendered_dom') throw new Error(`LINK-001 moet rendered_dom gebruiken, kreeg ${links?.data?.basis}`);
           if (!links?.evidence_ids?.includes('EV-BROWSER-DESKTOP')) throw new Error('LINK-001 mist rendered browser-evidence');
+          if (links?.data?.concurrency_limit !== 6) throw new Error('Linkprobe concurrency guard ontbreekt');
+          if (!mutation || JSON.stringify(mutation.data?.allowed_methods) !== JSON.stringify(['GET','HEAD'])) throw new Error('Browser mutation guard ontbreekt');
           NODE
+      - name: Verify public-safe browser evidence persistence
+        run: |
+          test -f results/runs/ci-public-test-v0.6.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const result = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
+          const persistence = result.observations.find((item) => item.id === 'RUNTIME-BROWSER-ARTIFACT-PERSISTENCE');
+          if (persistence?.outcome !== 'not_executed') throw new Error(`Expected not_executed artifact persistence, got ${persistence?.outcome}`);
+          if (result.evidence_registry.some((item) => item.id.startsWith('EV-FILE-'))) throw new Error('Public-safe run exposed EV-FILE evidence');
+          for (const id of ['EV-BROWSER-DESKTOP','EV-AXE-DESKTOP','EV-BROWSER-MOBILE','EV-AXE-MOBILE']) {
+            const evidence = result.evidence_registry.find((item) => item.id === id);
+            if (!evidence || !/^[a-f0-9]{64}$/i.test(evidence.sha256 || '')) throw new Error(`${id} missing hash-bound evidence`);
+          }
+          for (const run of result.browser_evidence?.runs || []) {
+            if (run.browser_error) continue;
+            if (run.artifacts_persisted !== false) throw new Error(`${run.viewport} unexpectedly persisted browser artifacts`);
+            if ((run.artifact_entries || []).length !== 0) throw new Error(`${run.viewport} exposed artifact entries`);
+          }
+          NODE
+          if find artifacts/runs/ci-public-test-v0.6 -type f -print -quit 2>/dev/null | grep -q .; then
+            echo "Public-safe CI persisted sensitive browser artifact files."
+            exit 1
+          fi
       - name: Verify material fingerprint repeatability
         run: |
           FIRST="$(node -p "JSON.parse(require('fs').readFileSync('results/latest.json','utf8')).artifact_fingerprint_sha256")"
-          npm run scan
+          CHECKLIST_PERSIST_BROWSER_ARTIFACTS=0 npm run scan
           npm run validate-result
           SECOND="$(node -p "JSON.parse(require('fs').readFileSync('results/latest.json','utf8')).artifact_fingerprint_sha256")"
           test -n "$FIRST"
           test "$FIRST" = "$SECOND"
-      - name: Verify run history and reproducibility artifacts
-        run: |
-          test -f results/runs/fixture-v0.5-source-bound.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/page.png
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/axe.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/dom-inventory.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/trace.zip
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/page.png
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/axe.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/dom-inventory.json
-          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/trace.zip
-      - name: Build formal evidence manifest from isolated policy fixture
-        run: node src/finalize.js policy/fixture.json results/formal-ci.json
+      - name: Build formal evidence manifest from current policy fixture
+        run: node src/finalize.js test/fixtures/policy.json results/formal-ci.json
       - name: Validate formal Evidence Manifest 3.0 semantics
         run: node src/validate-formal.js results/formal-ci.json
+      - name: Validate formal cross-field hardening
+        run: node src/validate-formal-hardening.js results/formal-ci.json
+      - name: Verify no-browser raw evidence cannot overclaim browser capabilities
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const raw = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
+          raw.request.request_id = 'no-browser-capability';
+          raw.evidence_registry = raw.evidence_registry.filter((item) => !/^EV-(?:BROWSER|AXE|FILE-BROWSER)-/.test(item.id));
+          raw.observations = raw.observations.filter((item) => !['RUNTIME-BROWSER','RUNTIME-UI-READINESS','RUNTIME-MUTATION-GUARD','RUNTIME-BROWSER-ARTIFACT-PERSISTENCE'].includes(item.id));
+          raw.runtime_observation.browser_harness = false;
+          raw.runtime_observation.browser_evidence = null;
+          raw.browser_evidence = { runs: [] };
+          raw.tool_versions = { runner_test_fixture: 'no-browser' };
+          fs.writeFileSync('results/runs/no-browser-capability.json', `${JSON.stringify(raw, null, 2)}\n`);
+          const policy = JSON.parse(fs.readFileSync('test/fixtures/policy.json', 'utf8'));
+          policy.evaluation_id = 'QA-NO-BROWSER-v0.6';
+          policy.request_id = 'no-browser-capability';
+          policy.rounds = [{ request_id: 'no-browser-capability', status: 'passed' }];
+          policy.required_runtime_ids = ['RT-PUBLIC-HTTP'];
+          fs.writeFileSync('policy/no-browser-ci.json', `${JSON.stringify(policy, null, 2)}\n`);
+          NODE
+          node src/finalize.js policy/no-browser-ci.json results/formal-no-browser.json
+          node src/validate-formal.js results/formal-no-browser.json
+          node src/validate-formal-hardening.js results/formal-no-browser.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data = JSON.parse(fs.readFileSync('results/formal-no-browser.json', 'utf8'));
+          for (const key of ['public_browser', 'browser_harness', 'cloud_browser']) {
+            if (data.capabilities[key] !== false) throw new Error(`${key} was overclaimed`);
+          }
+          NODE
+      - name: Verify legacy target environment is rejected
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data = JSON.parse(fs.readFileSync('results/formal-ci.json', 'utf8'));
+          delete data.scan_configuration.target_environment;
+          fs.writeFileSync('results/formal-legacy-env.json', `${JSON.stringify(data, null, 2)}\n`);
+          NODE
+          if node src/validate-formal-hardening.js results/formal-legacy-env.json; then
+            echo "Legacy formal evidence without target environment was incorrectly accepted."
+            exit 1
+          fi
+      - name: Verify forged production observation is rejected for public-test targets
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data = JSON.parse(fs.readFileSync('results/formal-ci.json', 'utf8'));
+          data.evidence_level = 'production_observation';
+          data.capabilities.production_observation = true;
+          fs.writeFileSync('results/formal-forged-production.json', `${JSON.stringify(data, null, 2)}\n`);
+          NODE
+          if node src/validate-formal-hardening.js results/formal-forged-production.json; then
+            echo "Forged production observation was incorrectly accepted."
+            exit 1
+          fi
       - name: Verify full Go is blocked without staging capability
         run: |
           node --input-type=module <<'NODE'
@@ -70,7 +158,7 @@ jobs:
           source.monitoring = { ready: true, plan: 'negative gate fixture', owner: 'website-qa-checklist', evidence_ids: [evidenceId] };
           fs.writeFileSync('results/formal-unsafe-go.json', `${JSON.stringify(source, null, 2)}\n`);
           NODE
-          if node src/validate-formal.js results/formal-unsafe-go.json; then
+          if node src/validate-formal.js results/formal-unsafe-go.json && node src/validate-formal-hardening.js results/formal-unsafe-go.json; then
             echo "Unsafe Go was incorrectly accepted."
             exit 1
           fi

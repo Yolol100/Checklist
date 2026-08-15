@@ -1,15 +1,16 @@
 {
-  "request_id": "final-e2e-v0.5-20260815-1755z",
+  "request_id": "ci-public-test-v0.6",
   "url": "https://example.com/",
   "level": "standard",
   "task_type": "audit",
-  "requested_at": "2026-08-15T17:55:00Z",
-  "requested_by": "ChatGPT",
+  "target_environment": "public_test",
+  "requested_at": "2026-08-15T19:10:00Z",
+  "requested_by": "CI fixture",
   "source_context": {
     "project_id": "project-checklist",
     "source_set_version": "2026-08-14.1-reconnaissance-before-action",
     "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46",
-    "selection_basis": "Final end-to-end integration verification on main after rendered-DOM, stable-fingerprint, formal-evidence and staging-gate hardening. Public read-only audit fixture only.",
+    "selection_basis": "CI-only public-test fixture for the hardened read-only runner; never a production-observation claim.",
     "selected_sources": [
       "active/00-project-index-en-router.md",
       "active/01-qa-proces-en-severity.md",

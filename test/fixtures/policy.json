@@ -1,0 +1,34 @@
+{
+  "schema_version": "policy-evaluation-v1",
+  "evaluation_id": "QA-CI-v0.6",
+  "request_id": "ci-public-test-v0.6",
+  "source_context": {
+    "project_id": "project-checklist",
+    "source_set_version": "2026-08-14.1-reconnaissance-before-action",
+    "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46"
+  },
+  "schema_hashes": {
+    "evidence_manifest": "a43fe9183e2141d2d9efc3b0192e399d7fff7433374542699ea59660c4af59e1",
+    "runtime_matrix": "9c6c6660e02193d126efbeb75b4943c5d7a82c1401852e69f6b72b9ee4576eb2"
+  },
+  "surface": {
+    "experience": "chat",
+    "host": "web",
+    "runtime_surface": "chat-web",
+    "app_connectors": true
+  },
+  "scope": {
+    "label": "CI fixture: hardened public-test read-only standard audit",
+    "included": ["public HTTP response","rendered Chromium desktop state","mobile viewport emulation","automated axe observation","target-environment claim gate"],
+    "excluded": ["authenticated flows","form submission","payments","representative staging","real device and assistive technology"]
+  },
+  "runtime_selection_basis": "Public-test read-only audit fixture: HTTP + Chromium desktop + mobile emulation are required; staging is not claimed.",
+  "required_runtime_ids": ["RT-PUBLIC-HTTP","RT-BROWSER-DESKTOP","RT-BROWSER-MOBILE"],
+  "in_scope_unexecuted_ids": [],
+  "findings": [],
+  "false_positives": [],
+  "rounds": [{"request_id":"ci-public-test-v0.6","status":"passed"}],
+  "rollback": {"available":false,"tested":false,"plan":"Niet van toepassing op deze read-only auditfixture.","owner":"website-qa-checklist","evidence_ids":[]},
+  "monitoring": {"ready":false,"plan":"Niet vereist voor deze auditfixture.","owner":"website-qa-checklist","evidence_ids":[]},
+  "release_decision": "conditional_go"
+}
