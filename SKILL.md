@@ -66,32 +66,36 @@ The runner rejects incomplete source preflight. A release request is rejected un
 `results/latest.json` uses `raw-evidence-v1`. It may contain:
 
 - public HTTP/redirect/header observations;
-- HTML/SEO observations;
-- internal-link and robots observations;
-- Chromium desktop/mobile-emulation evidence;
-- axe summaries plus full axe JSON artifacts;
-- full-page screenshots and Playwright traces;
-- console/page errors and mixed-content evidence;
-- synthetic navigation timing;
-- unexecuted/manual evidence gaps.
+- SEO and HTML observations;
+- internal-link sampling;
+- Playwright Chromium evidence;
+- desktop and mobile viewport emulation;
+- axe-core accessibility findings;
+- console/page-error and mixed-content evidence;
+- lab navigation timing.
 
-The raw runner must not output canonical `status`, `priority`, `severity`, `confidence` or a release `decision`. Those are owned by `website-qa-checklist` plus the active Drive sources.
-
-## Evidence limits
-
-- GitHub Actions Chromium is remote synthetic execution, not a local Chat browser.
-- A public live run can support `production_observation` for what was actually observed, but mobile emulation stays `execution_mode: emulated` and never becomes real-device or Safari/iOS evidence.
-- axe is supplementary and does not establish WCAG conformance.
-- No keyboard, zoom, real screenreader, true iOS/Safari, inbox delivery, authenticated flow, payment, order or form-submission proof is produced.
-- Synthetic timing is not CrUX/RUM field evidence.
+Treat these as evidence only. Do not let the runner redefine Checklist policy.
 
 ## Safety
 
-- Public read-only targets only.
-- Reject local/private/reserved targets, credentials and query parameters.
-- Never authenticate, submit forms, order, pay or mutate the target website.
-- The repository is public: never put secrets, personal data or confidential staging paths in a request.
+- Public read-only observations only.
+- Never submit forms, authenticate, place orders, run payments or change the target website.
+- Reject local/private/reserved targets and unsafe redirects.
+- Automated results do not prove keyboard, zoom, screenreader, real-device, real Safari/iOS, inbox delivery, payment or authenticated-flow behavior.
+- Preserve `Geblokkeerd` or `Te controleren` where the required evidence layer is unavailable.
+- Do not promote GitHub output to project truth; Drive remains authoritative.
+
+## Evidence levels
+
+- Public HTTP/robots/link observations may support `production_observation` for the live state actually observed.
+- Playwright/axe evidence from GitHub Actions stays `controlled_runtime` under the current Checklist source rules.
+- Mobile viewport emulation additionally uses `execution_mode: emulated`.
+- Neither becomes `browser_at`, real-device, true Safari/iOS or assistive-technology evidence without a separate real test layer.
+
+## Output
+
+Lead with the Checklist decision. Then state the most important failed/blocked items, what was tested, what remains untested and the highest evidence level. Use the canonical labels from the Website QA Skill.
 
 ## Failure rule
 
-If Drive source preflight, GitHub write access, Actions execution or evidence readback is unavailable, return `Geblokkeerd`/`handoff_required` according to the Website QA sources. Do not ask for an extra API key, tunnel or paid QA account as a fallback.
+If source preflight, GitHub write access or GitHub Actions is unavailable, report `Geblokkeerd`/`handoff_required` according to the Website QA sources. Do not fall back to asking the user to create an API key, tunnel, paid QA account or separate hosting account.
