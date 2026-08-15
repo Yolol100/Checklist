@@ -14,21 +14,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Syntax check
         run: npm run check
-      - name: Smoke test evidence runner
+      - name: Smoke test raw evidence runner
         run: npm run scan
       - name: Validate raw evidence contract
         run: npm run validate-result
-      - name: Verify reproducibility artifacts
+      - name: Verify run history and reproducibility artifacts
         run: |
-          test -f artifacts/latest/browser/desktop/page.png
-          test -f artifacts/latest/browser/desktop/axe.json
-          test -f artifacts/latest/browser/desktop/trace.zip
-          test -f artifacts/latest/browser/mobile/page.png
-          test -f artifacts/latest/browser/mobile/axe.json
-          test -f artifacts/latest/browser/mobile/trace.zip
+          test -f results/runs/fixture-v0.5-source-bound.json
+          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/page.png
+          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/axe.json
+          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/dom-inventory.json
+          test -f artifacts/runs/fixture-v0.5-source-bound/browser/desktop/trace.zip
+          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/page.png
+          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/axe.json
+          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/dom-inventory.json
+          test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/trace.zip
+      - name: Build formal evidence manifest from policy evaluation
+        run: npm run finalize
+      - name: Validate formal Evidence Manifest 3.0 semantics
+        run: npm run validate-formal
