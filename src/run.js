@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { runChecklist } from "./checklist.js";
+import { assertPublicUrl } from "./net.js";
 
 const root = process.cwd();
 const requestPath = path.join(root, "requests", "current.json");
@@ -14,24 +15,15 @@ if (!request.url || typeof request.url !== "string") {
   throw new Error("requests/current.json moet een geldige url bevatten.");
 }
 
-const target = new URL(request.url);
-if (!/^https?:$/.test(target.protocol)) {
-  throw new Error("Alleen publieke http- en https-URL's zijn toegestaan.");
-}
-
-const blockedHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
-if (blockedHosts.has(target.hostname.toLowerCase()) || target.hostname.endsWith(".local")) {
-  throw new Error("Lokale/private targets zijn niet toegestaan.");
-}
-
+const target = await assertPublicUrl(request.url, { allowQuery: false });
 const level = ["quick", "standard", "full"].includes(request.level) ? request.level : "standard";
 const requestId = request.request_id || `manual-${Date.now()}`;
-const result = await runChecklist(request.url, level);
 
+const result = await runChecklist(target.href, level);
 const payload = {
   request: {
     request_id: requestId,
-    url: request.url,
+    url: target.href,
     level,
     requested_at: request.requested_at || null,
     requested_by: request.requested_by || "ChatGPT"

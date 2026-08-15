@@ -1,12 +1,16 @@
 {
   "name": "webactueel-checklist-qa",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Read-only Webactueel checklist runner executed automatically by GitHub Actions.",
   "scripts": {
     "scan": "node src/run.js",
-    "check": "node --check src/checklist.js && node --check src/run.js"
+    "check": "node --check src/net.js && node --check src/browser.js && node --check src/checklist.js && node --check src/run.js"
+  },
+  "dependencies": {
+    "axe-core": "4.12.1",
+    "playwright": "1.62.0"
   },
   "engines": {
     "node": ">=20"

@@ -1,51 +1,100 @@
 # Webactueel Checklist QA
 
-Automated read-only website QA for the Webactueel `website-qa-checklist` workflow.
+Gratis, read-only website-QA die vanuit ChatGPT Web via de bestaande GitHub-koppeling kan worden gestart.
 
-## What you do
+## Gebruik vanuit ChatGPT
 
-Ask ChatGPT something like:
+Vraag bijvoorbeeld:
 
-> Voer Checklist uit op https://example.com
+> Voer Checklist standaard uit op https://example.com
 
-That is all. No API key, no terminal, no tunnel, no MCP server and no extra hosting account.
+of:
 
-## How it works
+> Voer Checklist volledig uit op https://example.com
 
-1. ChatGPT uses the already connected GitHub app.
-2. ChatGPT writes the requested URL and a unique request ID to `requests/current.json`.
-3. GitHub Actions automatically runs the checklist on a standard GitHub-hosted runner.
-4. The workflow writes the structured result to `results/latest.json`.
-5. ChatGPT reads that result and applies the installed Website QA Skill and active Checklist Drive sources to the evidence.
+Je hebt voor deze runner geen extra QA-account, API-key, MCP-server, tunnel of hostingdienst nodig. De bestaande GitHub-koppeling is de uitvoeringsroute.
 
-The repository is public and uses a standard `ubuntu-latest` GitHub-hosted runner. GitHub documents standard runners for public repositories as free.
+## Werking
 
-## What it checks now
+1. ChatGPT schrijft een unieke scanrequest naar `requests/current.json`.
+2. GitHub Actions start automatisch de `Run Checklist` workflow.
+3. De runner voert alleen publieke, read-only observaties uit.
+4. Het bewijs wordt opgeslagen in `results/latest.json`.
+5. ChatGPT accepteert alleen het resultaat met hetzelfde `request_id`.
+6. De geïnstalleerde `website-qa-checklist` Skill en de actieve Checklist-bronnen in Google Drive interpreteren het bewijs en bepalen de uiteindelijke QA/releaseclaim.
 
-- public URL reachability and HTTP status
-- HTTPS on the final URL
-- HSTS, CSP, X-Content-Type-Options and Referrer-Policy observations
-- title and meta description presence
-- H1 presence
-- missing `alt` attributes on images
-- form presence without submitting anything
-- broken-link sampling in `standard` and `full` modes
-- explicit manual-test boundaries for keyboard, zoom, screenreader and real-device evidence
-- Checklist-compatible statuses and release guidance
+## Automatische checks
 
-## Safety
+- publieke bereikbaarheid, statuscodes en redirects
+- HTTPS
+- HSTS, CSP, X-Content-Type-Options, Referrer-Policy en Permissions-Policy
+- title, meta description, canonical en meta robots/noindex-observatie
+- H1 en ontbrekende `alt`-attributen
+- interne linksteekproef
+- robots.txt-observatie
+- formulierdetectie zonder iets te versturen
+- Chromium via Playwright
+- desktop + mobiele viewportemulatie bij `standard`/`full`
+- axe-core toegankelijkheidsscan
+- `lang` en viewport-meta
+- console/page-errors
+- mixed-content subrequests
+- browserlab navigation timing
 
-The runner is read-only. It does not log in, submit forms, place orders, run payments, change content or mutate the target website. Local/private targets are rejected by the request runner.
+## Bewijsgrenzen
 
-## Repository contract
+De runner verklaart onderstaande onderdelen bewust niet automatisch geslaagd:
 
-- `SKILL.md` — tells ChatGPT how to invoke the workflow.
-- `requests/current.json` — the latest requested scan.
-- `.github/workflows/run-checklist.yml` — automatic execution.
-- `src/checklist.js` — checklist observations and labels.
-- `src/run.js` — request/result adapter.
-- `results/latest.json` — latest completed evidence package.
+- keyboard- en zoomtests
+- echte screenreader/assistive-technologytest
+- echte iPhone/iPad of echte Safari/iOS
+- echte inboxbezorging
+- formulierinzendingen
+- checkout, betalingen en orders
+- ingelogde flows
+- formele WCAG-conformiteit
+- echte Core Web Vitals-velddata
 
-## Project truth boundary
+Die onderdelen blijven `Geblokkeerd` of `Te controleren` wanneer de Checklist-bronnen dat bewijs vereisen.
 
-This repository is the execution layer only. The installed `website-qa-checklist` Skill and its active registered Google Drive Checklist source set remain the policy, acceptance and release-decision truth.
+## Veiligheid
+
+- Alleen `http`/`https`.
+- Lokale/private/gereserveerde IP-ranges worden geblokkeerd.
+- Redirects worden opnieuw gevalideerd.
+- URL's met credentials worden geweigerd.
+- Scanrequests met queryparameters worden geweigerd omdat deze repository publiek is en querystrings tokens/persoonsgegevens kunnen bevatten.
+- De runner logt niet in, verzendt geen formulieren en wijzigt de targetsite niet.
+- HTML-responses worden begrensd om onnodig grote downloads te voorkomen.
+
+## Checklist-bronnen
+
+Findings bevatten `source_refs` naar de relevante canonieke Checklist-bronnen, bijvoorbeeld:
+
+- `02-frontend-responsive-accessibility.md`
+- `03-formulieren-email-en-crm.md`
+- `04-seo-indexatie-en-migratie.md`
+- `06-wordpress-elementor-en-performance.md`
+- `08-security-en-technische-risicos.md`
+- `11-evidence-levels-runtime-matrix.md`
+- `82-tool-en-browsermatrix.md`
+- `88-playwright-axe-adapter.md`
+
+Deze bestanden worden niet gekopieerd naar GitHub. Google Drive blijft de projectwaarheid.
+
+## Repository
+
+- `SKILL.md` - ChatGPT-invocatiecontract
+- `agents/openai.yaml` - korte metadata
+- `requests/current.json` - laatste scanrequest
+- `.github/workflows/run-checklist.yml` - automatische uitvoering
+- `.github/workflows/ci.yml` - syntax- en browser-smoketest
+- `src/net.js` - publieke netwerk/SSRF-beveiliging
+- `src/browser.js` - Playwright + axe adapter
+- `src/checklist.js` - checks, labels en evidence
+- `src/run.js` - request/result adapter
+- `results/latest.json` - laatste afgeronde evidence
+
+## Projectwaarheid
+
+Deze repository is alleen de uitvoeringslaag. De geïnstalleerde `website-qa-checklist` Skill en de actieve geregistreerde Checklist-bronnen in Google Drive blijven leidend voor scope, prioriteit, bewijsvereisten en eindbesluit.
