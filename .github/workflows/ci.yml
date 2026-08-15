@@ -5,6 +5,9 @@ on:
     branches: [main, "build/**", "agent/**"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -21,6 +24,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Syntax check
         run: npm run check
+      - name: Adversarial unit and workflow tests
+        run: npm test
       - name: Smoke test raw evidence runner
         run: npm run scan
       - name: Validate raw evidence contract
