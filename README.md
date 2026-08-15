@@ -100,7 +100,7 @@ De runner bewijst niet automatisch:
 - formele WCAG-conformiteit
 - echte Core Web Vitals-velddata
 
-Een live publieke browserrun kan alleen `production_observation` ondersteunen voor wat daadwerkelijk is geobserveerd. Mobiele emulatie blijft `execution_mode: emulated` en wordt nooit echt-devicebewijs.
+Publieke HTTP/robots/linkobservaties kunnen `production_observation` ondersteunen voor wat daadwerkelijk live is waargenomen. De Playwright/axe-harness blijft volgens de Checklist-bronnen `controlled_runtime`; mobiele emulatie krijgt daarnaast `execution_mode: emulated`. Geen van beide wordt automatisch `browser_at` of echt-devicebewijs.
 
 ## Veiligheid
 
