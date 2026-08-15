@@ -50,13 +50,13 @@ test("write workflows require exactly one queue file and no bundled code changes
   }
 });
 
-test("production evidence commits immutable JSON only and uploads browser artifacts", () => {
+test("public production workflow persists only immutable JSON, never sensitive browser artifacts", () => {
   const run = read(".github/workflows/run-checklist.yml");
-  assert.match(run, /upload-artifact@[a-f0-9]{40}/i);
-  assert.match(run, /retention-days:\s+7/);
+  assert.doesNotMatch(run, /upload-artifact/);
   assert.doesNotMatch(run, /git add[^\n]*artifacts\/runs/);
   assert.match(run, /git add[^\n]*results\/runs/);
   assert.doesNotMatch(run, /git add[^\n]*results\/latest\.json/);
+  assert.match(run, /CHECKLIST_PERSIST_BROWSER_ARTIFACTS:\s*["']0["']/);
 });
 
 test("write workflows rebase before push to survive concurrent independent runs", () => {
@@ -76,10 +76,18 @@ test("browser safety blocks bypass protocols and pins HTTP(S) through the local 
   assert.match(browser, /startPublicNetworkProxy\(/);
   assert.match(browser, /force-webrtc-ip-handling-policy=disable_non_proxied_udp/);
   assert.match(browser, /--disable-quic/);
+  assert.match(browser, /CHECKLIST_PERSIST_BROWSER_ARTIFACTS/);
   assert.doesNotMatch(browser, /const allowedHosts = new Set\(\)/);
   assert.match(proxy, /resolvePublicHost\(/);
   assert.match(proxy, /net\.connect\(\{ host: address/);
   assert.match(network, /requester\(current, addresses/);
+});
+
+test("browser request guard is read-only at HTTP method level", () => {
+  const browser = read("src/browser.js");
+  assert.match(browser, /request\.method\(\)/);
+  assert.match(browser, /\["GET",\s*"HEAD"\]/);
+  assert.match(browser, /blockedWriteRequests/);
 });
 
 test("runner fails closed on invalid scan levels rather than silently downgrading", () => {
