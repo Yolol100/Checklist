@@ -1,6 +1,6 @@
 {
   "name": "webactueel-checklist-qa",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Read-only evidence runner and deterministic formal-evidence adapter for the Webactueel Website QA Skill, executed by GitHub Actions.",
@@ -10,7 +10,7 @@
     "validate-result": "node src/validate-result.js results/latest.json",
     "finalize": "node src/finalize.js",
     "validate-formal": "node src/validate-formal.js results/formal-latest.json",
-    "check": "node --check src/net.js && node --check src/artifacts.js && node --check src/browser.js && node --check src/checklist.js && node --check src/run.js && node --check src/validate-result.js && node --check src/finalize.js && node --check src/validate-formal.js"
+    "check": "node --check src/net.js && node --check src/privacy.js && node --check src/concurrency.js && node --check src/contracts.js && node --check src/artifacts.js && node --check src/browser.js && node --check src/checklist.js && node --check src/run.js && node --check src/validate-result.js && node --check src/finalize.js && node --check src/validate-formal.js"
   },
   "dependencies": {
     "axe-core": "4.12.1",
