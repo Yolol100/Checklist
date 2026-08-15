@@ -10,14 +10,18 @@ import {
 
 const blockedIpv4 = [
   "0.0.0.0", "10.0.0.1", "100.64.0.1", "127.0.0.1", "169.254.1.1",
-  "172.16.0.1", "192.0.0.1", "192.0.2.1", "192.168.1.1", "198.18.0.1",
-  "198.51.100.1", "203.0.113.1", "224.0.0.1", "255.255.255.255"
+  "172.16.0.1", "192.0.0.1", "192.0.2.1", "192.88.99.2", "192.168.1.1",
+  "198.18.0.1", "198.51.100.1", "203.0.113.1", "224.0.0.1", "255.255.255.255"
 ];
 const allowedIpv4 = ["1.1.1.1", "8.8.8.8"];
-const blockedIpv6 = ["::", "::1", "fc00::1", "fd00::1", "fe80::1", "ff02::1", "2001:db8::1", "::ffff:127.0.0.1"];
+const blockedIpv6 = [
+  "::", "::1", "::ffff:127.0.0.1", "64:ff9b:1::1", "100::1", "100:0:0:1::1",
+  "2001::1", "2001:2::1", "2001:10::1", "2001:db8::1", "2002::1", "3fff::1",
+  "5f00::1", "fc00::1", "fd00::1", "fe80::1", "fec0::1", "ff02::1"
+];
 const allowedIpv6 = ["2606:4700:4700::1111", "2001:4860:4860::8888"];
 
-test("IP classifier blocks private, link-local, benchmark and documentation ranges", () => {
+test("IP classifier blocks IANA special, private, transition, benchmark and documentation ranges", () => {
   for (const address of blockedIpv4) assert.equal(isPrivateIp(address), true, `${address} should be blocked`);
   for (const address of blockedIpv6) assert.equal(isPrivateIp(address), true, `${address} should be blocked`);
 });
