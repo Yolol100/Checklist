@@ -1,7 +1,7 @@
 {
-  "request_id": "smoke-2026-08-15T1555+0200",
+  "request_id": "smoke-v0.3-browser-20260815-1426z",
   "url": "https://example.com",
   "level": "standard",
-  "requested_at": "2026-08-15T15:55:00+02:00",
+  "requested_at": "2026-08-15T14:26:00Z",
   "requested_by": "ChatGPT"
 }
