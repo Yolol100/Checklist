@@ -1,0 +1,215 @@
+{
+  "request": {
+    "request_id": "smoke-2026-08-15T1555+0200",
+    "url": "https://example.com",
+    "level": "standard",
+    "requested_at": "2026-08-15T15:55:00+02:00",
+    "requested_by": "ChatGPT"
+  },
+  "schema_version": "0.1",
+  "runner": "webactueel-checklist-qa",
+  "runner_version": "0.1.0",
+  "level": "standard",
+  "target": "https://example.com/",
+  "final_url": "https://example.com/",
+  "started_at": "2026-08-15T13:58:02.598Z",
+  "completed_at": "2026-08-15T13:58:03.070Z",
+  "evidence_level": "production_observation",
+  "mutation_performed": false,
+  "decision": "Go na fixes",
+  "summary": {
+    "passed": 6,
+    "failed": 5,
+    "blocked": 2,
+    "to_check": 0,
+    "not_applicable": 1
+  },
+  "findings": [
+    {
+      "id": "HTTP-001",
+      "category": "bereikbaarheid",
+      "title": "Publieke pagina is bereikbaar",
+      "status": "Geslaagd",
+      "priority": "Hoog",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "requested_url": "https://example.com/",
+        "final_url": "https://example.com/",
+        "status_code": 200
+      },
+      "recommendation": "Geen actie."
+    },
+    {
+      "id": "TLS-001",
+      "category": "security",
+      "title": "Eind-URL gebruikt HTTPS",
+      "status": "Geslaagd",
+      "priority": "Hoog",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "final_url": "https://example.com/"
+      },
+      "recommendation": "Geen actie."
+    },
+    {
+      "id": "HDR-STRICT-TRANSPORT-SECURITY",
+      "category": "security",
+      "title": "HSTS aanwezig",
+      "status": "Mislukt",
+      "priority": "Hoog",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "header": "strict-transport-security",
+        "value": null
+      },
+      "recommendation": "Beoordeel en configureer HSTS passend voor de site."
+    },
+    {
+      "id": "HDR-CONTENT-SECURITY-POLICY",
+      "category": "security",
+      "title": "Content-Security-Policy aanwezig",
+      "status": "Mislukt",
+      "priority": "Midden",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "header": "content-security-policy",
+        "value": null
+      },
+      "recommendation": "Beoordeel en configureer Content-Security-Policy passend voor de site."
+    },
+    {
+      "id": "HDR-X-CONTENT-TYPE-OPTIONS",
+      "category": "security",
+      "title": "X-Content-Type-Options aanwezig",
+      "status": "Mislukt",
+      "priority": "Midden",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "header": "x-content-type-options",
+        "value": null
+      },
+      "recommendation": "Beoordeel en configureer X-Content-Type-Options passend voor de site."
+    },
+    {
+      "id": "HDR-REFERRER-POLICY",
+      "category": "security",
+      "title": "Referrer-Policy aanwezig",
+      "status": "Mislukt",
+      "priority": "Midden",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "header": "referrer-policy",
+        "value": null
+      },
+      "recommendation": "Beoordeel en configureer Referrer-Policy passend voor de site."
+    },
+    {
+      "id": "SEO-001",
+      "category": "seo",
+      "title": "HTML-title aanwezig",
+      "status": "Geslaagd",
+      "priority": "Hoog",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "title": "Example Domain",
+        "length": 14
+      },
+      "recommendation": "Controleer inhoud en zoekintentie in de SEO-skill."
+    },
+    {
+      "id": "SEO-002",
+      "category": "seo",
+      "title": "Meta description aanwezig",
+      "status": "Mislukt",
+      "priority": "Midden",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "description": null,
+        "length": 0
+      },
+      "recommendation": "Voeg een relevante meta description toe."
+    },
+    {
+      "id": "HTML-001",
+      "category": "frontend",
+      "title": "Pagina bevat een H1",
+      "status": "Geslaagd",
+      "priority": "Midden",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "h1_count": 1
+      },
+      "recommendation": "Controleer semantiek en inhoud handmatig."
+    },
+    {
+      "id": "A11Y-001",
+      "category": "accessibility",
+      "title": "Afbeeldingen hebben een alt-attribuut",
+      "status": "Geslaagd",
+      "priority": "Laag",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "image_count": 0,
+        "missing_alt_attribute_count": 0
+      },
+      "recommendation": "Beoordeel de alt-teksten inhoudelijk; lege alt kan correct zijn."
+    },
+    {
+      "id": "FORM-001",
+      "category": "forms",
+      "title": "Formulieren functioneel getest",
+      "status": "Niet van toepassing",
+      "priority": "Laag",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "form_count": 0,
+        "submitted": false
+      },
+      "recommendation": "Geen formulier op deze pagina gevonden."
+    },
+    {
+      "id": "LINK-001",
+      "category": "links",
+      "title": "Steekproef van links geeft geen HTTP-fout",
+      "status": "Geslaagd",
+      "priority": "Laag",
+      "confidence": "Bevestigd",
+      "evidence": {
+        "tested_count": 1,
+        "broken_count": 0,
+        "broken": []
+      },
+      "recommendation": "Vergroot de crawl bij een volledige audit."
+    },
+    {
+      "id": "A11Y-MANUAL",
+      "category": "accessibility",
+      "title": "Keyboard, zoom en screenreader getest",
+      "status": "Geblokkeerd",
+      "priority": "Hoog",
+      "confidence": "Handmatig testen nodig",
+      "evidence": {
+        "automated_runner_can_prove": false
+      },
+      "recommendation": "Voer keyboard-, zoom- en passende screenreadertests uit op een echte browser/AT-combinatie."
+    },
+    {
+      "id": "RUNTIME-REAL-DEVICE",
+      "category": "runtime",
+      "title": "Echt mobiel apparaat / echte Safari-iOS gecontroleerd",
+      "status": "Geblokkeerd",
+      "priority": "Midden",
+      "confidence": "Handmatig testen nodig",
+      "evidence": {
+        "automated_runner_can_prove": false
+      },
+      "recommendation": "Gebruik echt apparaatbewijs wanneer dit voor de wijziging of releaseclaim vereist is."
+    }
+  ],
+  "limitations": [
+    "Dit is publieke read-only observatie; geen ingelogde flow of productie-mutatie.",
+    "Geen formele WCAG-conformiteitsclaim.",
+    "Geen echte device- of assistive-technology-evidence.",
+    "Geen formulierinzendingen, betalingen, orders of andere writes."
+  ]
+}
