@@ -3,10 +3,10 @@ import path from "node:path";
 import { sha256Json } from "./artifacts.js";
 
 const root = process.cwd();
-const policyPath = path.join(root, "policy", "current.json");
+const policyPath = path.resolve(root, process.argv[2] || "policy/current.json");
 const resultsDir = path.join(root, "results");
 const runsDir = path.join(resultsDir, "runs");
-const outputPath = path.join(resultsDir, "formal-latest.json");
+const outputPath = path.resolve(root, process.argv[3] || "results/formal-latest.json");
 
 const TASK_TYPES = new Set(["audit", "cleanup", "scan_fix", "release_verification", "security_retest", "accessibility_retest", "live_smoke"]);
 const STABLE_TASKS = new Set(["cleanup", "scan_fix", "release_verification", "security_retest"]);
@@ -14,6 +14,9 @@ const RELEASE_DECISIONS = new Set(["source_go", "conditional_go", "go", "go_with
 const SEVERITIES = new Set(["critical", "high", "medium", "low"]);
 const FINDING_STATUSES = new Set(["open", "passed", "failed", "blocked", "to_fix", "closed", "accepted_risk", "false_positive"]);
 const ROUND_STATUSES = new Set(["passed", "failed", "blocked"]);
+const EXPERIENCES = new Set([null, "chat", "work", "codex"]);
+const HOSTS = new Set([null, "web", "mobile", "desktop", "cli"]);
+const MATRIX_SURFACES = new Set([null, "chat-web", "chat-desktop", "work-web", "work-mobile", "work-desktop", "codex-desktop", "codex-cli"]);
 const HEX64 = /^[a-f0-9]{64}$/i;
 
 function safeId(value) {
@@ -26,6 +29,10 @@ function requireCondition(condition, message) {
 
 async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, "utf8"));
+}
+
+function relativeToRoot(filePath) {
+  return path.relative(root, filePath).replaceAll("\\", "/");
 }
 
 function assertPolicy(policy) {
@@ -58,6 +65,16 @@ function assertPolicy(policy) {
   requireCondition(RELEASE_DECISIONS.has(policy.release_decision), "policy.release_decision is ongeldig");
   requireCondition(policy.rollback && typeof policy.rollback.available === "boolean" && typeof policy.rollback.tested === "boolean", "policy.rollback is onvolledig");
   requireCondition(policy.monitoring && typeof policy.monitoring.ready === "boolean", "policy.monitoring is onvolledig");
+
+  if (policy.surface !== undefined) {
+    requireCondition(policy.surface && typeof policy.surface === "object" && !Array.isArray(policy.surface), "policy.surface moet een object zijn");
+    requireCondition(EXPERIENCES.has(policy.surface.experience ?? null), "policy.surface.experience is ongeldig");
+    requireCondition(HOSTS.has(policy.surface.host ?? null), "policy.surface.host is ongeldig");
+    requireCondition(MATRIX_SURFACES.has(policy.surface.runtime_surface ?? null), "policy.surface.runtime_surface is ongeldig");
+    if (policy.surface.app_connectors !== undefined) {
+      requireCondition(typeof policy.surface.app_connectors === "boolean", "policy.surface.app_connectors moet boolean zijn");
+    }
+  }
 }
 
 function assertRawMatchesPolicy(raw, policy) {
@@ -90,86 +107,18 @@ function observationMap(raw) {
   return new Map((raw.observations || []).map((item) => [item.id, item]));
 }
 
-function rawEvidenceForObservation(raw, roundId, observationId) {
-  const observation = observationMap(raw).get(observationId);
-  if (!observation) return [];
-  return (observation.evidence_ids || []).map((id) => evidenceId(roundId, id));
-}
-
 function runtimeCandidates(raw, roundId) {
   const observations = observationMap(raw);
   const hasEvidence = (id) => (raw.evidence_registry || []).some((item) => item.id === id);
-  const candidate = [];
+  const candidates = [];
 
-  candidate.push({
-    id: "RT-PUBLIC-HTTP",
-    category: "platform",
-    component: "publieke HTTP-observatie",
-    target: raw.final_url,
-    execution_mode: "synthetic",
-    passed: observations.get("HTTP-001")?.outcome === "observed_ok",
-    evidence_ids: hasEvidence("EV-HTTP-MAIN") ? [evidenceId(roundId, "EV-HTTP-MAIN")] : [],
-    limitation: "Publieke read-only observatie; geen login of targetmutatie."
-  });
-
-  candidate.push({
-    id: "RT-BROWSER-DESKTOP",
-    category: "browser",
-    component: "Chromium desktop browserharness",
-    target: raw.final_url,
-    execution_mode: "synthetic",
-    passed: hasEvidence("EV-BROWSER-DESKTOP"),
-    evidence_ids: hasEvidence("EV-BROWSER-DESKTOP") ? [evidenceId(roundId, "EV-BROWSER-DESKTOP")] : [],
-    limitation: "Synthetische GitHub Actions Chromium-run; geen echte gebruikersbrowser."
-  });
-
-  candidate.push({
-    id: "RT-BROWSER-MOBILE",
-    category: "device",
-    component: "Chromium mobiele viewportemulatie",
-    target: raw.final_url,
-    execution_mode: "emulated",
-    passed: hasEvidence("EV-BROWSER-MOBILE"),
-    evidence_ids: hasEvidence("EV-BROWSER-MOBILE") ? [evidenceId(roundId, "EV-BROWSER-MOBILE")] : [],
-    limitation: "Viewportemulatie is geen echt mobiel apparaat of echte Safari/iOS."
-  });
-
-  candidate.push({
-    id: "RT-KEYBOARD-ZOOM-SCREENREADER",
-    category: "assistive_technology",
-    component: "keyboard, zoom en screenreader",
-    target: raw.final_url,
-    execution_mode: "not_executed",
-    passed: false,
-    evidence_ids: [],
-    limitation: observations.get("A11Y-MANUAL")?.note || "Aparte echte browser/input/AT-test nodig."
-  });
-
-  candidate.push({
-    id: "RT-REAL-IOS",
-    category: "device",
-    component: "echt mobiel apparaat / echte Safari-iOS",
-    target: raw.final_url,
-    execution_mode: "not_executed",
-    passed: false,
-    evidence_ids: [],
-    limitation: "Niet uitvoerbaar in deze remote read-only GitHub Actions runner."
-  });
-
-  if (observations.has("RUNTIME-CROSS-BROWSER")) {
-    candidate.push({
-      id: "RT-CROSS-BROWSER",
-      category: "browser",
-      component: "Firefox en WebKit/Safari-afdekking",
-      target: raw.final_url,
-      execution_mode: "not_executed",
-      passed: false,
-      evidence_ids: [],
-      limitation: "Deze runner voert alleen Chromium uit."
-    });
-  }
-
-  return candidate;
+  candidates.push({ id: "RT-PUBLIC-HTTP", category: "platform", component: "publieke HTTP-observatie", target: raw.final_url, execution_mode: "synthetic", passed: observations.get("HTTP-001")?.outcome === "observed_ok", evidence_ids: hasEvidence("EV-HTTP-MAIN") ? [evidenceId(roundId, "EV-HTTP-MAIN")] : [], limitation: "Publieke read-only observatie; geen login of targetmutatie." });
+  candidates.push({ id: "RT-BROWSER-DESKTOP", category: "browser", component: "Chromium desktop browserharness", target: raw.final_url, execution_mode: "synthetic", passed: hasEvidence("EV-BROWSER-DESKTOP"), evidence_ids: hasEvidence("EV-BROWSER-DESKTOP") ? [evidenceId(roundId, "EV-BROWSER-DESKTOP")] : [], limitation: "Synthetische GitHub Actions Chromium-run; geen echte gebruikersbrowser." });
+  candidates.push({ id: "RT-BROWSER-MOBILE", category: "device", component: "Chromium mobiele viewportemulatie", target: raw.final_url, execution_mode: "emulated", passed: hasEvidence("EV-BROWSER-MOBILE"), evidence_ids: hasEvidence("EV-BROWSER-MOBILE") ? [evidenceId(roundId, "EV-BROWSER-MOBILE")] : [], limitation: "Viewportemulatie is geen echt mobiel apparaat of echte Safari/iOS." });
+  candidates.push({ id: "RT-KEYBOARD-ZOOM-SCREENREADER", category: "assistive_technology", component: "keyboard, zoom en screenreader", target: raw.final_url, execution_mode: "not_executed", passed: false, evidence_ids: [], limitation: observations.get("A11Y-MANUAL")?.note || "Aparte echte browser/input/AT-test nodig." });
+  candidates.push({ id: "RT-REAL-IOS", category: "device", component: "echt mobiel apparaat / echte Safari-iOS", target: raw.final_url, execution_mode: "not_executed", passed: false, evidence_ids: [], limitation: "Niet uitvoerbaar in deze remote read-only GitHub Actions runner." });
+  if (observations.has("RUNTIME-CROSS-BROWSER")) candidates.push({ id: "RT-CROSS-BROWSER", category: "browser", component: "Firefox en WebKit/Safari-afdekking", target: raw.final_url, execution_mode: "not_executed", passed: false, evidence_ids: [], limitation: "Deze runner voert alleen Chromium uit." });
+  return candidates;
 }
 
 function buildRuntimeMatrix(raw, policy, roundId) {
@@ -177,6 +126,7 @@ function buildRuntimeMatrix(raw, policy, roundId) {
   const candidates = runtimeCandidates(raw, roundId);
   const known = new Set(candidates.map((item) => item.id));
   for (const id of required) requireCondition(known.has(id), `policy vereist onbekende runtime ${id}`);
+  const runtimeSurface = policy.surface?.runtime_surface ?? null;
 
   return {
     schema_version: "2.0",
@@ -196,10 +146,10 @@ function buildRuntimeMatrix(raw, policy, roundId) {
         evidence_ids: item.evidence_ids,
         limitation: item.limitation,
         not_applicable_reason: !isRequired && !item.passed ? "Niet verplicht binnen de door Website QA vastgelegde scope." : null,
-        surface: null,
+        surface: runtimeSurface,
         capability: item.id.startsWith("RT-BROWSER") ? "github-actions-remote-browser-harness" : item.id === "RT-PUBLIC-HTTP" ? "public-http" : null,
         invocation_status: item.passed ? "called" : isRequired ? "blocked" : "not_needed",
-        recommended_surface: item.id === "RT-KEYBOARD-ZOOM-SCREENREADER" ? "work-desktop" : null
+        recommended_surface: null
       };
     })
   };
@@ -214,7 +164,7 @@ function buildFormalFindings(raw, policy, roundId, policyEvidenceId) {
   return policy.findings.map((finding) => {
     const observation = observations.get(finding.observation_id);
     requireCondition(observation, `policy finding verwijst naar onbekende observatie ${finding.observation_id}`);
-    const rawIds = (finding.evidence_ids || observation.evidence_ids || []);
+    const rawIds = finding.evidence_ids || observation.evidence_ids || [];
     const mapped = rawIds.map((id) => evidenceId(roundId, id));
     return {
       id: finding.id || `F-${finding.observation_id}`,
@@ -234,7 +184,6 @@ function buildFormalFindings(raw, policy, roundId, policyEvidenceId) {
 
 const policy = await readJson(policyPath);
 assertPolicy(policy);
-
 const rounds = [];
 for (const round of policy.rounds) {
   const roundId = safeId(round.request_id);
@@ -255,52 +204,26 @@ if (STABLE_TASKS.has(latest.raw.request.task_type)) {
 const policyHash = sha256Json(policy);
 const policyEvidenceId = "EV-POLICY-EVALUATION";
 const registry = rounds.flatMap((item) => normalizeEvidence(item.raw, item.raw.request.request_id));
-registry.push({
-  id: policyEvidenceId,
-  type: "report",
-  source: "policy/current.json",
-  created_at: new Date().toISOString(),
-  environment: "website-qa-policy",
-  scope: policy.scope.label,
-  sha256: policyHash,
-  redaction: null
-});
+registry.push({ id: policyEvidenceId, type: "report", source: relativeToRoot(policyPath), created_at: new Date().toISOString(), environment: "website-qa-policy", scope: policy.scope.label, sha256: policyHash, redaction: null });
 
 const findings = buildFormalFindings(latest.raw, policy, latest.raw.request.request_id, policyEvidenceId);
 const findingsHash = sha256Json(findings);
-const contractHash = sha256Json({
-  source_context: policy.source_context,
-  schema_hashes: policy.schema_hashes
-});
-
-const formalRounds = rounds.map((item, index) => ({
-  round: index + 1,
-  status: item.policy_round.status,
-  artifact_sha256: item.raw.artifact_fingerprint_sha256,
-  contract_hash: contractHash,
-  findings_hash: findingsHash,
-  tool_config_hash: item.raw.configuration_hash,
-  evidence_ids: (item.raw.evidence_registry || []).map((evidence) => evidenceId(item.raw.request.request_id, evidence.id))
-}));
+const contractHash = sha256Json({ source_context: policy.source_context, schema_hashes: policy.schema_hashes });
+const formalRounds = rounds.map((item, index) => ({ round: index + 1, status: item.policy_round.status, artifact_sha256: item.raw.artifact_fingerprint_sha256, contract_hash: contractHash, findings_hash: findingsHash, tool_config_hash: item.raw.configuration_hash, evidence_ids: (item.raw.evidence_registry || []).map((evidence) => evidenceId(item.raw.request.request_id, evidence.id)) }));
 
 const matrix = buildRuntimeMatrix(latest.raw, policy, latest.raw.request.request_id);
 const evidenceLevels = new Set((latest.raw.evidence_registry || []).map((item) => item.evidence_level));
 const evidenceLevel = evidenceLevels.has("production_observation") ? "production_observation" : evidenceLevels.has("controlled_runtime") ? "controlled_runtime" : "source";
 const inScopeUnexecuted = new Set(policy.in_scope_unexecuted_ids);
 const unexecutedTests = (latest.raw.unexecuted_tests || []).filter((item) => inScopeUnexecuted.has(item.id));
-for (const id of inScopeUnexecuted) {
-  requireCondition((latest.raw.unexecuted_tests || []).some((item) => item.id === id), `policy noemt onbekende unexecuted test ${id}`);
-}
+for (const id of inScopeUnexecuted) requireCondition((latest.raw.unexecuted_tests || []).some((item) => item.id === id), `policy noemt onbekende unexecuted test ${id}`);
 
 const manifest = {
   schema_version: "3.0",
   run_id: policy.evaluation_id,
   generated_at: new Date().toISOString(),
   task_type: latest.raw.request.task_type,
-  artifact: {
-    name: latest.raw.final_url,
-    sha256: latest.raw.artifact_fingerprint_sha256
-  },
+  artifact: { name: latest.raw.final_url, sha256: latest.raw.artifact_fingerprint_sha256 },
   scope: policy.scope,
   evidence_level: evidenceLevel,
   capabilities: {
@@ -312,33 +235,19 @@ const manifest = {
     staging_access: false,
     production_observation: evidenceLevels.has("production_observation"),
     limitations: latest.raw.limitations || [],
-    experience: "chat",
-    host: "web",
+    experience: policy.surface?.experience ?? null,
+    host: policy.surface?.host ?? null,
     cloud_browser: false,
     local_files: false,
     local_repository: false,
     terminal_commands: false,
     browser_harness: true,
     desktop_app_control: false,
-    app_connectors: true
+    app_connectors: policy.surface?.app_connectors ?? null
   },
-  tool_versions: {
-    runner: latest.raw.runner?.version || "unknown",
-    ...latest.raw.tool_versions
-  },
-  scan_configuration: {
-    config_hash: latest.raw.configuration_hash,
-    level: latest.raw.request.level,
-    source_set_version: latest.raw.source_context.source_set_version,
-    manifest_sha256: latest.raw.source_context.manifest_sha256,
-    evidence_schema_sha256: policy.schema_hashes.evidence_manifest,
-    runtime_schema_sha256: policy.schema_hashes.runtime_matrix
-  },
-  environment: {
-    runner_host: "github-actions",
-    target: latest.raw.final_url,
-    source_project: "project-checklist"
-  },
+  tool_versions: { runner: latest.raw.runner?.version || "unknown", ...latest.raw.tool_versions },
+  scan_configuration: { config_hash: latest.raw.configuration_hash, level: latest.raw.request.level, source_set_version: latest.raw.source_context.source_set_version, manifest_sha256: latest.raw.source_context.manifest_sha256, evidence_schema_sha256: policy.schema_hashes.evidence_manifest, runtime_schema_sha256: policy.schema_hashes.runtime_matrix },
+  environment: { runner_host: "github-actions", target: latest.raw.final_url, source_project: "project-checklist" },
   baseline_contract_hash: contractHash,
   runtime_matrix: matrix,
   evidence_registry: registry,
@@ -347,19 +256,8 @@ const manifest = {
   false_positives: policy.false_positives || [],
   changes: [],
   unexecuted_tests: unexecutedTests,
-  rollback: {
-    available: policy.rollback.available,
-    tested: policy.rollback.tested,
-    plan: policy.rollback.plan || "",
-    owner: policy.rollback.owner || "website-qa-checklist",
-    evidence_ids: mapPolicyEvidenceIds(policy.rollback.evidence_ids, latest.raw.request.request_id)
-  },
-  monitoring: {
-    ready: policy.monitoring.ready,
-    plan: policy.monitoring.plan || "",
-    owner: policy.monitoring.owner || "website-qa-checklist",
-    evidence_ids: mapPolicyEvidenceIds(policy.monitoring.evidence_ids, latest.raw.request.request_id)
-  },
+  rollback: { available: policy.rollback.available, tested: policy.rollback.tested, plan: policy.rollback.plan || "", owner: policy.rollback.owner || "website-qa-checklist", evidence_ids: mapPolicyEvidenceIds(policy.rollback.evidence_ids, latest.raw.request.request_id) },
+  monitoring: { ready: policy.monitoring.ready, plan: policy.monitoring.plan || "", owner: policy.monitoring.owner || "website-qa-checklist", evidence_ids: mapPolicyEvidenceIds(policy.monitoring.evidence_ids, latest.raw.request.request_id) },
   release_decision: policy.release_decision
 };
 
@@ -367,8 +265,8 @@ if (policy.accepted_risks) manifest.accepted_risks = policy.accepted_risks;
 if (policy.security_profile !== undefined) manifest.security_profile = policy.security_profile;
 if (policy.score !== undefined) manifest.score = policy.score;
 
-await fs.mkdir(resultsDir, { recursive: true });
+await fs.mkdir(path.dirname(outputPath), { recursive: true });
 await fs.writeFile(outputPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-console.log(`Formal evidence manifest written: ${path.relative(root, outputPath)}`);
+console.log(`Formal evidence manifest written: ${relativeToRoot(outputPath)}`);
 console.log(`Policy evaluation: ${policy.evaluation_id}`);
 console.log(`Rounds: ${rounds.length}; findings: ${findings.length}; evidence objects: ${registry.length}`);
