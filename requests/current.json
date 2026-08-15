@@ -1,15 +1,15 @@
 {
-  "request_id": "fixture-v0.4-source-first",
+  "request_id": "reaudit-20260815-1659z",
   "url": "https://example.com/",
   "level": "standard",
   "task_type": "audit",
-  "requested_at": "2026-08-15T15:12:00Z",
+  "requested_at": "2026-08-15T16:59:00Z",
   "requested_by": "ChatGPT",
   "source_context": {
     "project_id": "project-checklist",
     "source_set_version": "2026-08-14.1-reconnaissance-before-action",
     "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46",
-    "selection_basis": "Website QA Skill preflight for a standard public read-only audit using the registered GitHub connector and remote GitHub Actions browser runner.",
+    "selection_basis": "Independent re-audit of the integrated Website QA chain from ChatGPT Web through the connected GitHub app and remote GitHub Actions runner, after re-reading the live Project Checklist manifest and mandatory source set.",
     "selected_sources": [
       "active/00-project-index-en-router.md",
       "active/01-qa-proces-en-severity.md",
