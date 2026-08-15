@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { assertPublicUrl } from "./net.js";
 import { describeArtifact, writeJsonArtifact } from "./artifacts.js";
+import { sanitizeEvidenceText, sanitizeUrlForEvidence, sanitizeUrlList } from "./privacy.js";
 
 const require = createRequire(import.meta.url);
 const axeSource = require("axe-core").source;
@@ -19,6 +20,8 @@ const BROWSER_CONFIG = {
   locale: "nl-NL",
   timezoneId: "Europe/Amsterdam",
   reducedMotion: "reduce",
+  serviceWorkers: "block",
+  webSockets: "blocked",
   waitUntil: "domcontentloaded",
   navigationTimeoutMs: 25_000,
   bodyVisibleTimeoutMs: 8_000,
@@ -31,16 +34,18 @@ function compactAxeViolations(violations) {
     id: violation.id,
     impact: violation.impact || "unknown",
     help: violation.help,
-    help_url: violation.helpUrl,
+    help_url: sanitizeUrlForEvidence(violation.helpUrl),
     node_count: violation.nodes.length,
     targets: violation.nodes.slice(0, 5).map((node) => node.target)
   }));
 }
 
 async function installPublicRequestGuard(context) {
-  const allowedHosts = new Set();
+  const blockedWebSockets = [];
+
   await context.route("**/*", async (route) => {
-    const requestUrl = route.request().url();
+    const request = route.request();
+    const requestUrl = request.url();
     let parsed;
     try {
       parsed = new URL(requestUrl);
@@ -49,21 +54,29 @@ async function installPublicRequestGuard(context) {
       return;
     }
 
-    if (!["http:", "https:"].includes(parsed.protocol)) {
+    if (["data:", "blob:", "about:"].includes(parsed.protocol)) {
       await route.continue();
+      return;
+    }
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      await route.abort("blockedbyclient");
       return;
     }
 
     try {
-      if (!allowedHosts.has(parsed.hostname)) {
-        await assertPublicUrl(parsed, { allowQuery: true });
-        allowedHosts.add(parsed.hostname);
-      }
+      await assertPublicUrl(parsed, { allowQuery: !request.isNavigationRequest() });
       await route.continue();
     } catch {
       await route.abort("blockedbyclient");
     }
   });
+
+  await context.routeWebSocket("**/*", async (webSocketRoute) => {
+    blockedWebSockets.push(sanitizeUrlForEvidence(webSocketRoute.url()));
+    await webSocketRoute.close({ code: 1008, reason: "Blocked by read-only QA runner" });
+  });
+
+  return { blockedWebSockets };
 }
 
 async function waitForMeaningfulReadiness(page) {
@@ -126,9 +139,10 @@ async function inspectViewport(browser, url, name, artifactRoot) {
     viewport,
     locale: BROWSER_CONFIG.locale,
     timezoneId: BROWSER_CONFIG.timezoneId,
-    reducedMotion: BROWSER_CONFIG.reducedMotion
+    reducedMotion: BROWSER_CONFIG.reducedMotion,
+    serviceWorkers: BROWSER_CONFIG.serviceWorkers
   });
-  await installPublicRequestGuard(context);
+  const networkGuard = await installPublicRequestGuard(context);
   await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
 
   const page = await context.newPage();
@@ -144,16 +158,19 @@ async function inspectViewport(browser, url, name, artifactRoot) {
   const domRelative = path.join(baseDir, "dom-inventory.json");
 
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text().slice(0, 500));
+    if (message.type() === "error") consoleErrors.push(sanitizeEvidenceText(message.text()));
   });
-  page.on("pageerror", (error) => pageErrors.push(error.message.slice(0, 500)));
+  page.on("pageerror", (error) => pageErrors.push(sanitizeEvidenceText(error.message)));
   page.on("requestfailed", (request) => {
     const failure = request.failure();
-    requestFailures.push({ url: request.url(), error: failure?.errorText || "unknown" });
+    requestFailures.push({
+      url: sanitizeUrlForEvidence(request.url()),
+      error: sanitizeEvidenceText(failure?.errorText || "unknown", 240)
+    });
   });
   page.on("request", (request) => {
     if (url.startsWith("https://") && request.url().startsWith("http://")) {
-      mixedContentRequests.push(request.url());
+      mixedContentRequests.push(sanitizeUrlForEvidence(request.url()));
     }
   });
 
@@ -175,11 +192,24 @@ async function inspectViewport(browser, url, name, artifactRoot) {
       const images = [...document.querySelectorAll("img")];
       const controls = [...document.querySelectorAll("button,input,select,textarea")];
       const baseHost = location.hostname;
+      const safeUrl = (value) => {
+        try {
+          const parsed = new URL(value, location.href);
+          if (!/^https?:$/.test(parsed.protocol)) return null;
+          parsed.username = "";
+          parsed.password = "";
+          parsed.search = "";
+          parsed.hash = "";
+          return parsed.href;
+        } catch {
+          return null;
+        }
+      };
       const internalLinks = anchors.map((node) => {
         try {
           const parsed = new URL(node.href, location.href);
-          parsed.hash = "";
-          return parsed.hostname === baseHost && /^https?:$/.test(parsed.protocol) ? parsed.href : null;
+          if (parsed.hostname !== baseHost || !/^https?:$/.test(parsed.protocol)) return null;
+          return safeUrl(parsed.href);
         } catch {
           return null;
         }
@@ -187,7 +217,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
       const inventory = {
         links: anchors.slice(0, 30).map((node) => ({
           text: (node.innerText || node.textContent || "").trim().replace(/\s+/g, " ").slice(0, 160),
-          href: node.href || null,
+          href: safeUrl(node.href),
           aria_label: node.getAttribute("aria-label") || null
         })),
         buttons: [...document.querySelectorAll("button")].slice(0, 30).map((node) => ({
@@ -209,7 +239,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
         description: document.querySelector('meta[name="description"]')?.getAttribute("content") || null,
         lang: html.getAttribute("lang") || null,
         viewport_meta: document.querySelector('meta[name="viewport"]')?.getAttribute("content") || null,
-        canonical: document.querySelector('link[rel~="canonical"]')?.href || null,
+        canonical: safeUrl(document.querySelector('link[rel~="canonical"]')?.href || null),
         robots_meta: document.querySelector('meta[name="robots"]')?.getAttribute("content") || null,
         h1_count: document.querySelectorAll("h1").length,
         form_count: document.querySelectorAll("form").length,
@@ -244,7 +274,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
       viewport: name,
       viewport_size: viewport,
       status_code: mainResponse?.status() || null,
-      final_url: page.url(),
+      final_url: sanitizeUrlForEvidence(page.url()),
       readiness,
       dom,
       axe: {
@@ -258,7 +288,8 @@ async function inspectViewport(browser, url, name, artifactRoot) {
       console_errors: consoleErrors.slice(0, 20),
       page_errors: pageErrors.slice(0, 20),
       request_failures: requestFailures.slice(0, 20),
-      mixed_content_requests: uniqueStrings(mixedContentRequests, 20),
+      mixed_content_requests: sanitizeUrlList(mixedContentRequests, 20),
+      websocket_requests: sanitizeUrlList(networkGuard.blockedWebSockets, 20),
       artifact_entries: artifactEntries
     };
   } finally {
@@ -274,7 +305,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
 }
 
 export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoot = "artifacts/latest") {
-  const target = await assertPublicUrl(rawUrl, { allowQuery: true });
+  const target = await assertPublicUrl(rawUrl, { allowQuery: false });
   const browser = await chromium.launch({ headless: true });
   try {
     const names = level === "quick" ? ["desktop"] : ["desktop", "mobile"];
@@ -286,7 +317,7 @@ export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoo
         runs.push({
           viewport: name,
           viewport_size: VIEWPORTS[name],
-          browser_error: error instanceof Error ? error.message : String(error),
+          browser_error: sanitizeEvidenceText(error instanceof Error ? error.message : String(error)),
           artifact_entries: []
         });
       }
@@ -298,7 +329,7 @@ export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoo
       browser: "chromium",
       browser_configuration: BROWSER_CONFIG,
       viewports: VIEWPORTS,
-      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
+      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. Service Workers en WebSocket-egress zijn geblokkeerd zodat netwerkinterceptie fail-closed blijft. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
       runs
     };
   } finally {
