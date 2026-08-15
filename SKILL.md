@@ -1,6 +1,6 @@
 ---
 name: checklist-runner-adapter
-description: Start the registered Yolol100/Checklist GitHub Actions evidence runner for public read-only Project Checklist QA after website-qa-checklist has loaded the live manifest and required Drive sources, then finalize the source-bound policy evaluation into Evidence Manifest 3.0. Use only as a capability adapter; it never owns QA policy, priority, status mapping or release decisions.
+description: Start the project-specific Yolol100/Checklist GitHub Actions evidence runner for public read-only Project Checklist QA after website-qa-checklist has loaded the live manifest and required Drive sources, then finalize the source-bound policy evaluation into Evidence Manifest 3.0. Use only as a capability adapter; it never owns QA policy, priority, status mapping or release decisions.
 ---
 
 # Checklist Runner Adapter
@@ -11,6 +11,10 @@ description: Start the registered Yolol100/Checklist GitHub Actions evidence run
 - `website-qa-checklist` remains QA owner and is the only layer that interprets observations into canonical status, severity, priority and release advice.
 - Registered Google Drive Project Checklist sources remain project truth.
 - `Yolol100/Checklist` is remote execution, evidence persistence and deterministic manifest transformation only.
+
+## Discovery boundary
+
+This repository contract does not install or globally register itself as a ChatGPT Skill. Until the live Project Checklist capability source and the installed `website-qa-checklist` package snapshot are updated together, do not infer this adapter from Chat Web alone. Invoke it only when the current workflow already identifies `Yolol100/Checklist` as the intended capability, for example from explicit user/project context. Do not mutate Drive registration by itself because that would create Skill↔source drift.
 
 ## Phase 1 — source-first raw evidence
 
