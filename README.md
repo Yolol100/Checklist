@@ -1,135 +1,105 @@
 # Webactueel Checklist QA Runner
 
-Gratis, publieke read-only QA-evidencerunner voor Project Checklist. ChatGPT Web gebruikt de bestaande GitHub-koppeling om GitHub Actions uit te voeren; de repository is **geen** QA-beleidslaag.
+Publieke read-only QA-evidencerunner voor Project Checklist. ChatGPT gebruikt de bestaande GitHub-koppeling om GitHub Actions uit te voeren; deze repository is **geen** QA-beleidslaag.
 
-## Eén gesloten keten
+## Keten
 
-`webactueel-workflow → website-qa-checklist → live Drive-bronnen → GitHub raw runner → website-qa-checklist policy-evaluation → GitHub formalizer → Evidence Manifest 3.0 → releasegates → webactueel-workflow`
-
-Rollen:
+`webactueel-workflow → website-qa-checklist → live Drive-bronnen → GitHub raw runner → Website QA policy-evaluation → GitHub formalizer → Evidence Manifest 3.0 → releasegates → webactueel-workflow`
 
 - **Webactueel Workflow** — controller bij gecoördineerd/beheerd werk.
-- **Website QA Skill** — QA-eigenaar: scope, labels, severity/prioriteit, interpretatie en releaseadvies.
-- **Google Drive Project Checklist** — actuele projectwaarheid en capabilityregistratie.
-- **Deze repository** — remote read-only evidencecollectie, immutable run history en deterministische manifesttransformatie.
+- **Website QA Skill** — QA-eigenaar voor scope, labels, severity/prioriteit, interpretatie en releaseadvies.
+- **Google Drive Project Checklist** — actuele projectwaarheid.
+- **Deze repository** — remote read-only evidencecollectie, immutable JSON-history, korte browser-artifactretentie en deterministische manifesttransformatie.
 
-## Fase 1 — bronpreflight en raw evidence
+## Raw request — append-only
 
-Iedere request bevat:
+Productieruns gebruiken geen gedeeld `current/latest`-slot. Maak één nieuw bestand:
 
-- actuele `source_set_version`;
-- canonieke manifest-SHA-256;
-- exact vooraf gelezen bronnen;
-- SHA-256 van iedere geselecteerde bron;
-- scope/selectiebasis en taaktype.
+`requests/queue/<request_id>.json`
 
-Minimaal worden vóór een run gelezen:
+De bestandsnaam moet exact gelijk zijn aan `request_id`; een ID wordt nooit hergebruikt. Iedere request bevat onder meer:
 
-- `active/00-project-index-en-router.md`
-- `active/01-qa-proces-en-severity.md`
-- `active/11-evidence-levels-runtime-matrix.md`
-- `support/82-tool-en-browsermatrix.md`
-- `support/83-evidence-manifest-schema.json`
-- `support/84-runtime-matrix-schema.json`
-- `support/87-master-project-checklist.md`
-- `support/88-playwright-axe-adapter.md`
+- publieke URL zonder credentials/queryparameters;
+- `level`: `quick`, `standard` of `full`;
+- `task_type`: `audit`, `live_smoke` of `release_verification`;
+- `target_environment`: `production`, `staging` of `public_test`;
+- actuele `source_set_version` en manifest-SHA-256;
+- unieke vooraf gelezen bronnen plus exact één SHA-256 per bron.
 
-Voor `release_verification` daarnaast `active/09-release-go-no-go-en-hertest.md` en `active/13-release-scoring-and-claim-gates.md`.
+Voor `release_verification` zijn active `09` en `13` verplicht naast de vaste bronpreflight.
 
-De runner weigert incomplete bronpreflight of ontbrekende bronhashes.
+De workflow schrijft alleen `results/runs/<request_id>.json` terug naar Git. `results/latest.json` is uitsluitend een lokale/CI-compatibiliteitspointer en geen productie-interface.
 
-`Run Checklist` levert:
+## Browser evidence
 
-- `results/latest.json` — laatste `raw-evidence-v1`;
-- `results/runs/<request_id>.json` — immutable run history;
-- `artifacts/runs/<request_id>/...` — screenshots, DOM/readiness-inventaris, volledige axe-JSON en Playwright traces.
-
-## Dynamische UI-readiness
-
-De browserharness baseert DOM-bevindingen niet meer primair op server-HTML. Na `domcontentloaded`:
+Na `domcontentloaded`:
 
 1. moet `body` zichtbaar zijn;
 2. wordt op DOM mutation-quiescence gewacht;
 3. wordt de gerenderde DOM/readiness-inventaris vastgelegd;
-4. daarna worden title/meta/H1/forms/alt/interne links en axe beoordeeld.
+4. daarna worden DOM-observaties en axe uitgevoerd.
 
-Er wordt geen `networkidle`-claim of algemene blinde sleep gebruikt. Als de browserlaag ontbreekt, wordt server-HTML expliciet als fallback gemarkeerd.
+Hardening:
 
-## Fase 2 — policy-evaluation en formeel manifest
+- iedere HTTP(S)-browserrequest wordt opnieuw tegen de public-network guard gecontroleerd;
+- Service Workers zijn geblokkeerd zodat request interception niet wordt omzeild;
+- WebSocket-egress is geblokkeerd en wordt als beperking geregistreerd;
+- documentnavigaties met queryparameters worden geweigerd;
+- interne linkchecks gebruiken maximaal zes gelijktijdige requests;
+- credentials, URL-query's/fragments en veelvoorkomende tokenpatronen worden uit repository-evidence verwijderd.
 
-De runner kiest nooit zelf severity, prioriteit of Go/No-Go. `policy_evaluation` in raw evidence blijft `null`.
+Screenshots, DOM-inventory, volledige axe JSON en Playwright traces worden als GitHub Actions artifact bewaard met 7 dagen retentie. Nieuwe browserartifacts worden niet meer in Git-history gecommit.
 
-Na broninterpretatie schrijft Website QA alleen `policy/current.json` (`policy-evaluation-v1`) met:
+## Formele policy — append-only
 
-- source-/schema-binding;
-- scope;
-- benodigde runtime-items;
-- in-scope onuitgevoerde tests;
-- bevindingen met owner/severity/status;
-- rollback/monitoring;
-- releasebesluit;
-- gebruikte raw round-request-ID's.
+Website QA schrijft na interpretatie één nieuw bestand:
 
-`Finalize Checklist` zet dit deterministisch om naar `results/formal-latest.json` en valideert Evidence Manifest 3.0/Runtime Matrix 2.0 semantiek. Voor release/stabiele taken zijn twee **verschillende** raw runs verplicht; één run mag niet worden gedupliceerd als twee rondes.
+`policy/queue/<evaluation_id>.json`
 
-## Reproduceerbaarheid
+De workflow bouwt en valideert daarna:
 
-- Node 22 in GitHub Actions;
-- exact gepinde `playwright` en `axe-core`;
-- `package-lock.json` lockfile v3;
-- workflows gebruiken `npm ci`;
-- bron- en schemahashes zijn onderdeel van het request/beleid;
-- raw run history en artifactpaden zijn request-ID-gebonden.
+`results/formal/<evaluation_id>.json`
 
-## Uitgevoerde automatische observaties
+De formalizer kiest zelf nooit severity, status, prioriteit of releasebesluit. Hij valideert bron/schema-binding, runtime-evidence en cross-field claims. `public_test` of een willekeurige publieke staging-URL mag niet als `production_observation` worden gepresenteerd. Volledige `go` vereist onder meer een daadwerkelijk `required+passed` `RT-STAGING`-item en `staging_access=true`.
 
-- publieke HTTP-status, redirects en responseheaders;
-- HTTPS/securityheader-aanwezigheid;
-- rendered title, meta description, canonical, robots/noindex;
-- rendered H1, afbeeldingen/alt en formulierdetectie zonder submit;
-- interne linksteekproef en robots.txt;
-- Chromium desktop + mobiele viewportemulatie;
-- axe-core;
-- `lang`, viewport-meta, console/page-errors en mixed content;
-- synthetische navigation timing.
+Voor cleanup, scan-fix, release verification en security retest blijven minstens twee verschillende stabiele raw rondes verplicht.
 
-## Bewijsgrenzen
+## Reproduceerbaarheid en supply chain
 
-Niet automatisch bewezen:
+- Node 22 op `ubuntu-24.04`;
+- `playwright` en `axe-core` exact gepind in `package-lock.json`;
+- `npm ci --ignore-scripts --no-audit --no-fund`;
+- Playwright wordt via de lokaal geïnstalleerde CLI gestart, niet via een `npx`-fallback;
+- GitHub Actions zijn op volledige 40-teken commit-SHA's gepind;
+- CI gebruikt `contents: read`; alleen de twee append-only write workflows krijgen `contents: write`;
+- concurrerende resultwrites gebruiken bounded rebase/push retries en schrijven unieke paden.
 
-- keyboard/zoom;
-- echte screenreader/AT;
-- echte iPhone/iPad of echte Safari/iOS;
-- inboxbezorging;
-- formulierinzending;
-- checkout/betalingen/orders;
-- ingelogde flows;
-- formele WCAG-conformiteit;
-- echte Core Web Vitals-velddata.
+## Automatische observaties
 
-Publieke netwerkobservaties kunnen `production_observation` ondersteunen voor wat live is waargenomen. GitHub Actions Playwright/axe blijft `controlled_runtime`; mobiele emulatie is `emulated`.
+Onder andere publieke HTTP-status/redirects/headers, rendered title/meta/canonical/robots/H1/forms/alt, interne linksteekproef, robots.txt, Chromium desktop, mobiele viewportemulatie, axe-core, `lang`, viewport-meta, console/page-errors, mixed content en synthetische navigation timing.
 
-## Veiligheid
+Niet automatisch bewezen zijn onder andere keyboard/zoom, echte screenreader/AT, echte Safari/iOS/device, inboxbezorging, form submit, checkout/betalingen/orders, authenticated flows, formele WCAG-conformiteit, representatieve staging/rollback en echte Core Web Vitals-velddata.
 
-- alleen publieke `http`/`https` targets;
-- private/lokale/gereserveerde netwerken en unsafe redirects geblokkeerd;
-- credentials en queryparameters geweigerd;
-- geen login, form submit, betaling, order of andere targetmutatie;
-- repository is publiek: geen secrets, persoonsgegevens of vertrouwelijke stagingpaden in request/policy.
+## Privacygrens
+
+De repository is publiek. Een queue-request blijft in Git-history staan en maakt dus de doel-hostnaam en het pad publiek. Gebruik deze route niet voor vertrouwelijke staginghosts, geheime/unpublished paden, persoonsgegevens of secrets. De v0.6-redactie voorkomt toekomstige query/tokenlekken in repository-evidence, maar wist eerder gecommitteerde historische artifacts niet uit Git-history.
 
 ## Belangrijkste bestanden
 
-- `SKILL.md` — capability-adaptercontract
-- `requests/current.json` — source-first raw request
-- `policy/current.json` — Website QA policy-evaluation
-- `src/browser.js` — Playwright/axe/readiness/artifacts
-- `src/checklist.js` — neutrale observaties
-- `src/run.js` — bronpoort, raw evidence en run history
-- `src/finalize.js` — deterministic raw+policy → formeel manifest
+- `SKILL.md` — project-specifiek capability-adaptercontract
+- `requests/queue/` — append-only productie-requests
+- `policy/queue/` — append-only policy-evaluations
+- `results/runs/` — immutable raw JSON
+- `results/formal/` — immutable formele manifests
+- `src/net.js` — SSRF/public-network guard
+- `src/browser.js` — Playwright/axe/readiness/network guard
+- `src/contracts.js` — strict queue/request contracts
+- `src/privacy.js` — repository-evidence-redactie
+- `src/concurrency.js` — begrensde read-only probes
+- `src/run.js` — raw evidence
+- `src/finalize.js` — raw+policy → formeel manifest
 - `src/validate-result.js` — raw contractvalidatie
-- `src/validate-formal.js` — formele semantische validatie
-- `.github/workflows/run-checklist.yml` — raw runner
-- `.github/workflows/finalize-checklist.yml` — formalizer
-- `.github/workflows/ci.yml` — volledige regressiegate
+- `src/validate-formal.js` + `src/validate-formal-hardening.js` — formele semantische/claimvalidatie
+- `.github/workflows/` — CI, raw runner en formalizer
 
 Drive blijft de projectwaarheid. Deze repository bepaalt nooit zelfstandig of een site `Geslaagd`, `Mislukt`, `Go` of `No-go` is.
