@@ -1,6 +1,9 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { assertPublicUrl } from "./net.js";
+import { describeArtifact, writeJsonArtifact } from "./artifacts.js";
 
 const require = createRequire(import.meta.url);
 const axeSource = require("axe-core").source;
@@ -10,6 +13,15 @@ const axeVersion = require("axe-core/package.json").version;
 const VIEWPORTS = {
   desktop: { width: 1366, height: 768 },
   mobile: { width: 390, height: 844 }
+};
+
+const BROWSER_CONFIG = {
+  locale: "nl-NL",
+  timezoneId: "Europe/Amsterdam",
+  reducedMotion: "reduce",
+  waitUntil: "domcontentloaded",
+  navigationTimeoutMs: 25_000,
+  loadTimeoutMs: 7_000
 };
 
 function compactAxeViolations(violations) {
@@ -52,21 +64,27 @@ async function installPublicRequestGuard(context) {
   });
 }
 
-async function inspectViewport(browser, url, name) {
+async function inspectViewport(browser, url, name, artifactRoot) {
   const viewport = VIEWPORTS[name];
   const context = await browser.newContext({
     viewport,
-    locale: "nl-NL",
-    timezoneId: "Europe/Amsterdam",
-    reducedMotion: "reduce"
+    locale: BROWSER_CONFIG.locale,
+    timezoneId: BROWSER_CONFIG.timezoneId,
+    reducedMotion: BROWSER_CONFIG.reducedMotion
   });
   await installPublicRequestGuard(context);
+  await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
 
   const page = await context.newPage();
   const consoleErrors = [];
   const pageErrors = [];
   const requestFailures = [];
   const mixedContentRequests = [];
+  const artifactEntries = [];
+  const baseDir = path.join("browser", name);
+  const traceRelative = path.join(baseDir, "trace.zip");
+  const screenshotRelative = path.join(baseDir, "page.png");
+  const axeRelative = path.join(baseDir, "axe.json");
 
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text().slice(0, 500));
@@ -83,34 +101,27 @@ async function inspectViewport(browser, url, name) {
   });
 
   let mainResponse;
+  let axeFull;
+  let dom;
   try {
-    mainResponse = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25_000 });
-    await page.waitForLoadState("load", { timeout: 7_000 }).catch(() => {});
-    await page.waitForTimeout(350);
+    mainResponse = await page.goto(url, {
+      waitUntil: BROWSER_CONFIG.waitUntil,
+      timeout: BROWSER_CONFIG.navigationTimeoutMs
+    });
+    await page.waitForLoadState("load", { timeout: BROWSER_CONFIG.loadTimeoutMs }).catch(() => {});
 
     await page.addScriptTag({ content: axeSource });
-    const axe = await page.evaluate(async () => {
-      const result = await globalThis.axe.run(document);
-      return {
-        violations: result.violations,
-        passes: result.passes.length,
-        incomplete: result.incomplete.length,
-        inapplicable: result.inapplicable.length
-      };
-    });
+    axeFull = await page.evaluate(async () => globalThis.axe.run(document));
 
-    const dom = await page.evaluate(() => {
+    dom = await page.evaluate(() => {
       const navigation = performance.getEntriesByType("navigation")[0];
       const html = document.documentElement;
-      const viewportMeta = document.querySelector('meta[name="viewport"]')?.getAttribute("content") || null;
-      const canonical = document.querySelector('link[rel~="canonical"]')?.href || null;
-      const robots = document.querySelector('meta[name="robots"]')?.getAttribute("content") || null;
       return {
         title: document.title || null,
         lang: html.getAttribute("lang") || null,
-        viewport_meta: viewportMeta,
-        canonical,
-        robots_meta: robots,
+        viewport_meta: document.querySelector('meta[name="viewport"]')?.getAttribute("content") || null,
+        canonical: document.querySelector('link[rel~="canonical"]')?.href || null,
+        robots_meta: document.querySelector('meta[name="robots"]')?.getAttribute("content") || null,
         h1_count: document.querySelectorAll("h1").length,
         form_count: document.querySelectorAll("form").length,
         interactive_count: document.querySelectorAll("a,button,input,select,textarea,[tabindex]").length,
@@ -124,6 +135,13 @@ async function inspectViewport(browser, url, name) {
       };
     });
 
+    await fs.mkdir(path.join(artifactRoot, baseDir), { recursive: true });
+    await page.screenshot({ path: path.join(artifactRoot, screenshotRelative), fullPage: true });
+    await writeJsonArtifact(artifactRoot, axeRelative, axeFull);
+
+    artifactEntries.push(await describeArtifact(artifactRoot, screenshotRelative, "screenshot", `${name} full-page screenshot`));
+    artifactEntries.push(await describeArtifact(artifactRoot, axeRelative, "report", `${name} volledige axe JSON`));
+
     return {
       viewport: name,
       viewport_size: viewport,
@@ -131,23 +149,32 @@ async function inspectViewport(browser, url, name) {
       final_url: page.url(),
       dom,
       axe: {
-        violation_count: axe.violations.length,
-        serious_or_critical_count: axe.violations.filter((item) => ["serious", "critical"].includes(item.impact)).length,
-        passes: axe.passes,
-        incomplete: axe.incomplete,
-        violations: compactAxeViolations(axe.violations)
+        violation_count: axeFull.violations.length,
+        serious_or_critical_count: axeFull.violations.filter((item) => ["serious", "critical"].includes(item.impact)).length,
+        passes: axeFull.passes.length,
+        incomplete: axeFull.incomplete.length,
+        inapplicable: axeFull.inapplicable.length,
+        violations: compactAxeViolations(axeFull.violations)
       },
       console_errors: consoleErrors.slice(0, 20),
       page_errors: pageErrors.slice(0, 20),
       request_failures: requestFailures.slice(0, 20),
-      mixed_content_requests: [...new Set(mixedContentRequests)].slice(0, 20)
+      mixed_content_requests: [...new Set(mixedContentRequests)].slice(0, 20),
+      artifact_entries: artifactEntries
     };
   } finally {
+    try {
+      await fs.mkdir(path.dirname(path.join(artifactRoot, traceRelative)), { recursive: true });
+      await context.tracing.stop({ path: path.join(artifactRoot, traceRelative) });
+      artifactEntries.push(await describeArtifact(artifactRoot, traceRelative, "trace", `${name} Playwright trace`));
+    } catch {
+      // A failed trace must not hide the primary browser result.
+    }
     await context.close();
   }
 }
 
-export async function runBrowserEvidence(rawUrl, level = "standard") {
+export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoot = "artifacts/latest") {
   const target = await assertPublicUrl(rawUrl, { allowQuery: true });
   const browser = await chromium.launch({ headless: true });
   try {
@@ -155,12 +182,13 @@ export async function runBrowserEvidence(rawUrl, level = "standard") {
     const runs = [];
     for (const name of names) {
       try {
-        runs.push(await inspectViewport(browser, target.href, name));
+        runs.push(await inspectViewport(browser, target.href, name, artifactRoot));
       } catch (error) {
         runs.push({
           viewport: name,
           viewport_size: VIEWPORTS[name],
-          browser_error: error instanceof Error ? error.message : String(error)
+          browser_error: error instanceof Error ? error.message : String(error),
+          artifact_entries: []
         });
       }
     }
@@ -169,7 +197,9 @@ export async function runBrowserEvidence(rawUrl, level = "standard") {
       tool: "playwright+axe-core",
       tool_versions: { playwright: playwrightVersion, axe_core: axeVersion },
       browser: "chromium",
-      emulation_note: "De mobile-run is viewport/browseremulatie en bewijst geen echte iPhone, Safari of hardware.",
+      browser_configuration: BROWSER_CONFIG,
+      viewports: VIEWPORTS,
+      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
       runs
     };
   } finally {
