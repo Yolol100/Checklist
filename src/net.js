@@ -49,12 +49,9 @@ export async function resolvePublicHost(hostname, lookup = dns.lookup) {
   if (isBlockedHostnameLiteral(host)) throw new Error("Lokale, private of gereserveerde targets zijn niet toegestaan.");
   const version = net.isIP(host);
   if (version) return [{ address: host, family: version }];
-
   const addresses = await lookup(host, { all: true, verbatim: true });
   if (!addresses.length) throw new Error("Hostnaam kon niet publiek worden opgelost.");
-  if (addresses.some(({ address }) => isPrivateIp(address))) {
-    throw new Error("Hostnaam verwijst naar een lokaal, privaat of gereserveerd IP-adres.");
-  }
+  if (addresses.some(({ address }) => isPrivateIp(address))) throw new Error("Hostnaam verwijst naar een lokaal, privaat of gereserveerd IP-adres.");
   return [...addresses].sort((a, b) => a.family - b.family);
 }
 
@@ -99,11 +96,7 @@ async function requestPinned(url, addresses, { timeoutMs, method = "GET", header
           const hasNoBody = method === "HEAD" || [204, 205, 304].includes(incoming.statusCode || 0);
           const body = hasNoBody ? null : Readable.toWeb(incoming);
           if (hasNoBody) incoming.resume();
-          resolve(new Response(body, {
-            status: incoming.statusCode || 500,
-            statusText: incoming.statusMessage || "",
-            headers: responseHeaders(incoming)
-          }));
+          resolve(new Response(body, { status: incoming.statusCode || 500, statusText: incoming.statusMessage || "", headers: responseHeaders(incoming) }));
         });
         request.setTimeout(timeoutMs, () => request.destroy(new Error(`Request timeout na ${timeoutMs}ms.`)));
         request.once("error", reject);
@@ -120,22 +113,26 @@ export async function safeFetch(rawUrl, options = {}) {
   const {
     maxRedirects = 5,
     timeoutMs = 15000,
-    allowQuery = true,
+    allowQuery = false,
     method = "GET",
-    headers = {}
+    headers = {},
+    resolver = resolvePublicHost,
+    requester = requestPinned
   } = options;
 
   let current = rawUrl instanceof URL ? new URL(rawUrl.href) : new URL(rawUrl);
   const redirectChain = [];
-
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
     if (!/^https?:$/.test(current.protocol)) throw new Error("Alleen http- en https-URL's zijn toegestaan.");
     if (current.username || current.password) throw new Error("URL's met gebruikersnaam of wachtwoord zijn niet toegestaan.");
-    if (!allowQuery && current.search) throw new Error("Gebruik een publieke URL zonder queryparameters; requests worden in deze publieke repository opgeslagen.");
+    if (!allowQuery && current.search) throw new Error("Automatische probes volgen geen URL's met queryparameters.");
     assertDefaultPort(current);
     current.hash = "";
-    const addresses = await resolvePublicHost(current.hostname);
-    const response = await requestPinned(current, addresses, { timeoutMs, method, headers });
+    const addresses = await resolver(current.hostname);
+    if (!Array.isArray(addresses) || !addresses.length || addresses.some(({ address }) => isPrivateIp(address))) {
+      throw new Error("Resolver leverde geen uitsluitend publieke IP-adressen op.");
+    }
+    const response = await requester(current, addresses, { timeoutMs, method, headers });
 
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location");
@@ -144,18 +141,15 @@ export async function safeFetch(rawUrl, options = {}) {
       const next = new URL(location, current);
       if (!/^https?:$/.test(next.protocol)) throw new Error("Alleen http- en https-URL's zijn toegestaan.");
       if (next.username || next.password) throw new Error("URL's met gebruikersnaam of wachtwoord zijn niet toegestaan.");
-      if (!allowQuery && next.search) throw new Error("Gebruik een publieke URL zonder queryparameters; requests worden in deze publieke repository opgeslagen.");
+      if (!allowQuery && next.search) throw new Error("Automatische probes volgen geen redirects met queryparameters.");
       assertDefaultPort(next);
-      await resolvePublicHost(next.hostname);
       next.hash = "";
       redirectChain.push({ from: current.href, status: response.status, to: next.href });
       current = next;
       continue;
     }
-
     return { response, finalUrl: current.href, redirectChain };
   }
-
   throw new Error("Redirectlimiet overschreden.");
 }
 
@@ -163,7 +157,6 @@ export async function readTextLimited(response, maxBytes = 2_500_000) {
   const declaredLength = Number(response.headers.get("content-length") || 0);
   if (declaredLength > maxBytes) throw new Error(`Response is groter dan ${maxBytes} bytes.`);
   if (!response.body) return "";
-
   const reader = response.body.getReader();
   const chunks = [];
   let total = 0;
@@ -177,7 +170,6 @@ export async function readTextLimited(response, maxBytes = 2_500_000) {
     }
     chunks.push(value);
   }
-
   const bytes = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) {
