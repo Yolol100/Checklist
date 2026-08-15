@@ -1,5 +1,4 @@
 import express from "express";
-import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
@@ -76,12 +75,7 @@ app.get("/", (_req, res) => {
 app.post("/mcp", async (req, res) => {
   const server = createMcpServer();
   const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => randomUUID()
-  });
-
-  res.on("close", () => {
-    transport.close().catch(() => {});
-    server.close().catch(() => {});
+    sessionIdGenerator: undefined
   });
 
   try {
@@ -92,6 +86,9 @@ app.post("/mcp", async (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({ error: "MCP request failed" });
     }
+  } finally {
+    await transport.close().catch(() => {});
+    await server.close().catch(() => {});
   }
 });
 
