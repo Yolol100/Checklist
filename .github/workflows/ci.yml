@@ -25,6 +25,25 @@ jobs:
         run: npm run scan
       - name: Validate raw evidence contract
         run: npm run validate-result
+      - name: Verify rendered DOM authority
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const result = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
+          const readiness = result.observations.find((item) => item.id === 'RUNTIME-UI-READINESS');
+          const links = result.observations.find((item) => item.id === 'LINK-001');
+          if (readiness?.outcome !== 'observed_ok') throw new Error('UI-readiness fixture is niet observed_ok');
+          if (links?.data?.basis !== 'rendered_dom') throw new Error(`LINK-001 moet rendered_dom gebruiken, kreeg ${links?.data?.basis}`);
+          if (!links?.evidence_ids?.includes('EV-BROWSER-DESKTOP')) throw new Error('LINK-001 mist rendered browser-evidence');
+          NODE
+      - name: Verify material fingerprint repeatability
+        run: |
+          FIRST="$(node -p "JSON.parse(require('fs').readFileSync('results/latest.json','utf8')).artifact_fingerprint_sha256")"
+          npm run scan
+          npm run validate-result
+          SECOND="$(node -p "JSON.parse(require('fs').readFileSync('results/latest.json','utf8')).artifact_fingerprint_sha256")"
+          test -n "$FIRST"
+          test "$FIRST" = "$SECOND"
       - name: Verify run history and reproducibility artifacts
         run: |
           test -f results/runs/fixture-v0.5-source-bound.json
