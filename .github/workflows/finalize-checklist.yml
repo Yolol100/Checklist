@@ -62,8 +62,11 @@ jobs:
       - name: Build formal evidence manifest
         run: node src/finalize.js "${{ steps.policy.outputs.policy_path }}" "${{ steps.policy.outputs.formal_path }}"
 
-      - name: Validate formal Evidence Manifest 3.0 semantics
+      - name: Validate Evidence Manifest 3.0 schema semantics
         run: node src/validate-formal.js "${{ steps.policy.outputs.formal_path }}"
+
+      - name: Validate formal cross-field hardening
+        run: node src/validate-formal-hardening.js "${{ steps.policy.outputs.formal_path }}"
 
       - name: Commit immutable formal manifest
         shell: bash
