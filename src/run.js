@@ -13,8 +13,7 @@ const resultRunsDir = path.join(resultDir, "runs");
 const resultPath = path.join(resultDir, "latest.json");
 
 function qualifyArtifactEntry(entry, runId) {
-  const artifactName = process.env.CHECKLIST_ARTIFACT_NAME;
-  return { ...entry, source: artifactName ? `github-actions-artifact:${artifactName}/${entry.source}` : `artifacts/runs/${runId}/${entry.source}` };
+  return { ...entry, source: `artifacts/runs/${runId}/${entry.source}` };
 }
 
 function artifactBySuffix(entries, suffix) {
@@ -54,6 +53,7 @@ function sanitizeResultForPublicJson(result) {
   }
 
   const browserRuns = (result.browser_evidence?.runs || []).filter((run) => !run.browser_error);
+  const browserEvidenceIds = browserRuns.map((run) => `EV-BROWSER-${run.viewport.toUpperCase()}`);
   const blockedWrites = browserRuns.flatMap((run) => (run.blocked_write_requests || []).map((item) => ({ viewport: run.viewport, ...item })));
   result.observations.push({
     id: "RUNTIME-MUTATION-GUARD",
@@ -61,12 +61,27 @@ function sanitizeResultForPublicJson(result) {
     title: "Browser write-method guard",
     outcome: blockedWrites.length ? OUTCOME.INTERPRET : OUTCOME.OK,
     source_refs: ["active/11-evidence-levels-runtime-matrix.md", "support/82-tool-en-browsermatrix.md", "support/88-playwright-axe-adapter.md"],
-    evidence_ids: browserRuns.map((run) => `EV-BROWSER-${run.viewport.toUpperCase()}`),
+    evidence_ids: browserEvidenceIds,
     data: { allowed_methods: ["GET", "HEAD"], blocked_count: blockedWrites.length, blocked_requests: blockedWrites.slice(0, 20) },
     note: blockedWrites.length
       ? "De pagina probeerde schrijvende HTTP-methodes; de runner heeft die vóór netwerkverkeer geblokkeerd. Functionaliteit die daarvan afhankelijk is, is daardoor niet bewezen."
       : "Geen schrijvende HTTP-methodes doorgelaten; de browserguard stond gedurende de run op GET/HEAD-only."
   });
+
+  const artifactsPersisted = browserRuns.length > 0 && browserRuns.every((run) => run.artifacts_persisted === true);
+  result.observations.push({
+    id: "RUNTIME-BROWSER-ARTIFACT-PERSISTENCE",
+    category: "runtime",
+    title: "Volledige browserartifacts veilig gepersisteerd",
+    outcome: artifactsPersisted ? OUTCOME.OK : OUTCOME.NOT_EXECUTED,
+    source_refs: ["active/11-evidence-levels-runtime-matrix.md", "support/82-tool-en-browsermatrix.md", "support/88-playwright-axe-adapter.md"],
+    evidence_ids: browserEvidenceIds,
+    data: { persisted: artifactsPersisted, public_repository_safe_mode: !artifactsPersisted },
+    note: artifactsPersisted
+      ? "Volledige browserartifacts zijn expliciet in de gekozen runtime gepersisteerd."
+      : "Publieke-repositorymodus bewaart bewust geen screenshots, Playwright traces, volledige axe JSON of DOM-snapshots. Gebruik een private/goedgekeurde evidence store wanneer die artifacts verplicht zijn."
+  });
+  if (!artifactsPersisted) result.limitations.push("Volledige browserartifacts (screenshot, trace, volledige axe JSON en DOM-snapshot) zijn in publieke-repositorymodus niet gepersisteerd wegens privacyrisico; alleen geredigeerde/hashgebonden runtime-evidence blijft beschikbaar.");
   return result;
 }
 
@@ -87,7 +102,7 @@ function buildEvidenceRegistry(result, runId, targetEnvironment) {
     const viewport = run.viewport.toUpperCase();
     const files = (run.artifact_entries || []).map((entry) => qualifyArtifactEntry(entry, runId));
     const screenshot = artifactBySuffix(files, "page.png");
-    const axe = artifactBySuffix(files, "axe.json");
+    const axeArtifact = artifactBySuffix(files, "axe.json");
     const trace = artifactBySuffix(files, "trace.zip");
     const domInventory = artifactBySuffix(files, "dom-inventory.json");
     registry.push({
@@ -96,7 +111,17 @@ function buildEvidenceRegistry(result, runId, targetEnvironment) {
       sha256: sha256Json({ status_code: run.status_code, final_url: run.final_url, readiness: run.readiness, dom: run.dom, console_errors: run.console_errors, page_errors: run.page_errors, request_failures: run.request_failures, mixed_content_requests: run.mixed_content_requests, websocket_requests: run.websocket_requests, blocked_write_requests: run.blocked_write_requests }),
       artifacts: [screenshot?.source, trace?.source, domInventory?.source].filter(Boolean)
     });
-    if (axe) registry.push({ id: `EV-AXE-${viewport}`, type: "report", source: axe.source, created_at: axe.created_at, environment, scope: `${result.final_url} (${run.viewport})`, evidence_level: "controlled_runtime", execution_mode: run.viewport === "mobile" ? "emulated" : "synthetic", sha256: axe.sha256 });
+    registry.push({
+      id: `EV-AXE-${viewport}`,
+      type: "report",
+      source: axeArtifact?.source || `runtime:axe-${run.viewport}`,
+      created_at: axeArtifact?.created_at || createdAt,
+      environment,
+      scope: `${result.final_url} (${run.viewport})`,
+      evidence_level: "controlled_runtime",
+      execution_mode: run.viewport === "mobile" ? "emulated" : "synthetic",
+      sha256: axeArtifact?.sha256 || sha256Json(run.axe || {})
+    });
     for (const file of files) registry.push({ ...file, evidence_level: "controlled_runtime", execution_mode: run.viewport === "mobile" ? "emulated" : "synthetic" });
   }
   return registry;
