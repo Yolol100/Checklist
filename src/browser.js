@@ -11,6 +11,7 @@ const require = createRequire(import.meta.url);
 const axeSource = require("axe-core").source;
 const playwrightVersion = require("playwright/package.json").version;
 const axeVersion = require("axe-core/package.json").version;
+const PERSIST_BROWSER_ARTIFACTS = process.env.CHECKLIST_PERSIST_BROWSER_ARTIFACTS === "1";
 
 const VIEWPORTS = {
   desktop: { width: 1366, height: 768 },
@@ -27,6 +28,7 @@ const BROWSER_CONFIG = {
   dnsPinningProxy: true,
   webRtcIpHandlingPolicy: "disable_non_proxied_udp",
   quic: "disabled",
+  artifactPersistence: PERSIST_BROWSER_ARTIFACTS ? "explicit-opt-in" : "disabled",
   waitUntil: "domcontentloaded",
   navigationTimeoutMs: 25_000,
   bodyVisibleTimeoutMs: 8_000,
@@ -127,7 +129,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
     serviceWorkers: BROWSER_CONFIG.serviceWorkers
   });
   const networkGuard = await installPublicRequestGuard(context);
-  await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
+  if (PERSIST_BROWSER_ARTIFACTS) await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
 
   const page = await context.newPage();
   const consoleErrors = [];
@@ -237,13 +239,16 @@ async function inspectViewport(browser, url, name, artifactRoot) {
 
     await page.addScriptTag({ content: axeSource });
     axeFull = await page.evaluate(async () => globalThis.axe.run(document));
-    await fs.mkdir(path.join(artifactRoot, baseDir), { recursive: true });
-    await page.screenshot({ path: path.join(artifactRoot, screenshotRelative), fullPage: true });
-    await writeJsonArtifact(artifactRoot, axeRelative, axeFull);
-    await writeJsonArtifact(artifactRoot, domRelative, { readiness, dom });
-    artifactEntries.push(await describeArtifact(artifactRoot, screenshotRelative, "screenshot", `${name} full-page screenshot`));
-    artifactEntries.push(await describeArtifact(artifactRoot, axeRelative, "report", `${name} volledige axe JSON`));
-    artifactEntries.push(await describeArtifact(artifactRoot, domRelative, "report", `${name} DOM/readiness inventaris`));
+
+    if (PERSIST_BROWSER_ARTIFACTS) {
+      await fs.mkdir(path.join(artifactRoot, baseDir), { recursive: true });
+      await page.screenshot({ path: path.join(artifactRoot, screenshotRelative), fullPage: true });
+      await writeJsonArtifact(artifactRoot, axeRelative, axeFull);
+      await writeJsonArtifact(artifactRoot, domRelative, { readiness, dom });
+      artifactEntries.push(await describeArtifact(artifactRoot, screenshotRelative, "screenshot", `${name} full-page screenshot`));
+      artifactEntries.push(await describeArtifact(artifactRoot, axeRelative, "report", `${name} volledige axe JSON`));
+      artifactEntries.push(await describeArtifact(artifactRoot, domRelative, "report", `${name} DOM/readiness inventaris`));
+    }
 
     return {
       viewport: name,
@@ -266,15 +271,18 @@ async function inspectViewport(browser, url, name, artifactRoot) {
       mixed_content_requests: sanitizeUrlList(mixedContentRequests, 20),
       websocket_requests: sanitizeUrlList(networkGuard.blockedWebSockets, 20),
       blocked_write_requests: networkGuard.blockedWriteRequests.slice(0, 20),
+      artifacts_persisted: PERSIST_BROWSER_ARTIFACTS,
       artifact_entries: artifactEntries
     };
   } finally {
-    try {
-      await fs.mkdir(path.dirname(path.join(artifactRoot, traceRelative)), { recursive: true });
-      await context.tracing.stop({ path: path.join(artifactRoot, traceRelative) });
-      artifactEntries.push(await describeArtifact(artifactRoot, traceRelative, "trace", `${name} Playwright trace`));
-    } catch {
-      // A failed trace must not hide the primary browser result.
+    if (PERSIST_BROWSER_ARTIFACTS) {
+      try {
+        await fs.mkdir(path.dirname(path.join(artifactRoot, traceRelative)), { recursive: true });
+        await context.tracing.stop({ path: path.join(artifactRoot, traceRelative) });
+        artifactEntries.push(await describeArtifact(artifactRoot, traceRelative, "trace", `${name} Playwright trace`));
+      } catch {
+        // A failed trace must not hide the primary browser result.
+      }
     }
     await context.close();
   }
@@ -295,7 +303,7 @@ export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoo
       try {
         runs.push(await inspectViewport(browser, target.href, name, artifactRoot));
       } catch (error) {
-        runs.push({ viewport: name, viewport_size: VIEWPORTS[name], browser_error: sanitizeEvidenceText(error instanceof Error ? error.message : String(error)), artifact_entries: [] });
+        runs.push({ viewport: name, viewport_size: VIEWPORTS[name], browser_error: sanitizeEvidenceText(error instanceof Error ? error.message : String(error)), artifacts_persisted: false, artifact_entries: [] });
       }
     }
     return {
@@ -304,7 +312,7 @@ export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoo
       browser: "chromium",
       browser_configuration: BROWSER_CONFIG,
       viewports: VIEWPORTS,
-      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. HTTP(S)-egress gaat via een lokale DNS-pinning proxy; alleen GET/HEAD zijn toegestaan en Service Workers, WebSocket-egress, non-proxied WebRTC UDP en QUIC zijn geblokkeerd. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
+      execution_note: `GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. HTTP(S)-egress gaat via een lokale DNS-pinning proxy; alleen GET/HEAD zijn toegestaan en Service Workers, WebSocket-egress, non-proxied WebRTC UDP en QUIC zijn geblokkeerd. Volledige screenshots/traces/axe/DOM-artifacts worden ${PERSIST_BROWSER_ARTIFACTS ? "expliciet lokaal gepersisteerd" : "niet gepersisteerd in publieke modus"}. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.`,
       runs
     };
   } finally {
