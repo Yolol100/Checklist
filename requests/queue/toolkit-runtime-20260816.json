@@ -1,0 +1,33 @@
+{
+  "request_id": "toolkit-runtime-20260816",
+  "url": "https://example.com/",
+  "level": "full",
+  "task_type": "audit",
+  "target_environment": "public_test",
+  "source_context": {
+    "project_id": "project-checklist",
+    "source_set_version": "2026-08-15.2-checklist-github-adapter",
+    "manifest_sha256": "e82662d29ffbf4bcf2f5f01af290336860d842d98b389859fe6b8e8c059df080",
+    "selected_sources": [
+      "active/00-project-index-en-router.md",
+      "active/01-qa-proces-en-severity.md",
+      "active/11-evidence-levels-runtime-matrix.md",
+      "support/82-tool-en-browsermatrix.md",
+      "support/83-evidence-manifest-schema.json",
+      "support/84-runtime-matrix-schema.json",
+      "support/87-master-project-checklist.md",
+      "support/88-playwright-axe-adapter.md"
+    ],
+    "source_hashes": {
+      "active/00-project-index-en-router.md": "5021928d21e2e689ece4b0a385cd38246a331ca4687302e706c794c9dcc5cd1d",
+      "active/01-qa-proces-en-severity.md": "787e2edb7b5d6bd07daabe2bacc8a91d801ea0561da6bc116be50138e53ed875",
+      "active/11-evidence-levels-runtime-matrix.md": "bf118db2307a557b1a6bd8ea30d03a1c2b7b59751f362151e8c35756eebd0de9",
+      "support/82-tool-en-browsermatrix.md": "000e2409d5ca3000bb6a87117c97db22e10c64f5f6f2478ba06fceed932d313b",
+      "support/83-evidence-manifest-schema.json": "a43fe9183e2141d2d9efc3b0192e399d7fff7433374542699ea59660c4af59e1",
+      "support/84-runtime-matrix-schema.json": "9c6c6660e02193d126efbeb75b4943c5d7a82c1401852e69f6b72b9ee4576eb2",
+      "support/87-master-project-checklist.md": "ab40e46d4d0f682e0ea07cb152429c74a18061ab8e28b5ad3ebb6674b977790e",
+      "support/88-playwright-axe-adapter.md": "5d9991ab37cfddf316c148ffcc13745bdf3aec955da94d71f4423ca22741e5b8"
+    },
+    "selection_basis": "Full controlled-runtime verification of the newly merged cross-browser, local Nu, Lighthouse and bounded link-check toolkit using the minimum required Checklist source set."
+  }
+}
