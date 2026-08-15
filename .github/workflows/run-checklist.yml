@@ -107,7 +107,9 @@ jobs:
           TARGET_URL: ${{ steps.request.outputs.target_url }}
         run: |
           export CHROME_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")"
-          lhci collect --url="$TARGET_URL" --numberOfRuns=1
+          # GitHub-hosted Ubuntu 24.04 can block Chromium's process sandbox via AppArmor/user namespaces.
+          # Scope the official LHCI no-sandbox workaround to this disposable Lighthouse lab process only.
+          lhci collect --url="$TARGET_URL" --numberOfRuns=1 --settings.chromeFlags="--no-sandbox"
 
       - name: Merge supplemental evidence
         run: node src/append-supplemental.js "${{ steps.request.outputs.request_path }}"
