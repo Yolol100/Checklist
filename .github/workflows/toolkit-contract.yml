@@ -38,5 +38,8 @@ jobs:
           assert 'firefox webkit' in workflow
           assert '@lhci/cli@0.15.1' in workflow
           assert 'VNU_SHA256' in workflow
+          assert 'lhci collect --url="$TARGET_URL" --numberOfRuns=1 --settings.chromeFlags="--no-sandbox"' in workflow
+          assert 'PLAYWRIGHT_CHROMIUM_ARGS=--no-sandbox' not in workflow
+          assert 'CHECKLIST_BROWSER_ARGS=--no-sandbox' not in workflow
           print('toolkit-contract: OK')
           PY
