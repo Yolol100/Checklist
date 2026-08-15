@@ -25,7 +25,12 @@ test("supplemental link probing stays GET/HEAD-only and queryless", () => {
   assert.doesNotMatch(match[0], /method:\s*["'](?:POST|PUT|PATCH|DELETE)["']/);
 });
 
-test("public raw runner strips detailed DOM inventory text before serialization", () => {
-  assert.match(runner, /inventory_summary/);
-  assert.match(runner, /delete\s+run\.dom\.inventory|run\.dom\.inventory\s*=\s*undefined/);
+test("public raw payload does not serialize detailed browser_evidence or DOM inventory", () => {
+  const payloadBlock = runner.match(/const payload = \{[\s\S]*?\n\};\n\nawait fs\.mkdir/);
+  assert.ok(payloadBlock, "public payload block not found");
+  assert.doesNotMatch(payloadBlock[0], /browser_evidence\s*:/);
+  assert.doesNotMatch(payloadBlock[0], /dom\s*:/);
+  assert.doesNotMatch(payloadBlock[0], /inventory\s*:/);
+  assert.match(payloadBlock[0], /evidence_registry:\s*evidenceRegistry/);
+  assert.match(payloadBlock[0], /observations:\s*result\.observations/);
 });
