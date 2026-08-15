@@ -28,9 +28,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -44,14 +45,14 @@ jobs:
       - name: Validate raw evidence contract
         run: npm run validate-result
 
-      - name: Save evidence bundle to repository
+      - name: Save immutable run evidence and latest pointer
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add results/latest.json artifacts/latest
+          git add results/latest.json results/runs artifacts/runs
           if git diff --cached --quiet; then
             echo "No evidence changes to commit."
           else
-            git commit -m "Update latest checklist evidence"
+            git commit -m "Update checklist raw evidence"
             git push origin HEAD:main
           fi
