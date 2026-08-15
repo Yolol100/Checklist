@@ -27,8 +27,9 @@ test("GitHub Actions are pinned to immutable full commit SHAs", () => {
   }
 });
 
-test("production workflow does not commit browser artifacts into public git history", () => {
+test("public production workflow neither commits nor uploads browser artifacts", () => {
   const source = read(".github/workflows/run-checklist.yml");
   assert.doesNotMatch(source, /git add[^\n]*artifacts\/runs/);
-  assert.match(source, /upload-artifact/);
+  assert.doesNotMatch(source, /upload-artifact/);
+  assert.match(source, /CHECKLIST_PERSIST_BROWSER_ARTIFACTS:\s*["']0["']/);
 });
