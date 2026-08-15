@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { sha256Json } from "./artifacts.js";
+import { assertSafeIdentifier } from "./contracts.js";
 
 const root = process.cwd();
 const policyPath = path.resolve(root, process.argv[2] || "policy/current.json");
@@ -19,10 +20,6 @@ const HOSTS = new Set([null, "web", "mobile", "desktop", "cli"]);
 const MATRIX_SURFACES = new Set([null, "chat-web", "chat-desktop", "work-web", "work-mobile", "work-desktop", "codex-desktop", "codex-cli"]);
 const HEX64 = /^[a-f0-9]{64}$/i;
 
-function safeId(value) {
-  return String(value).replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120);
-}
-
 function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -37,8 +34,8 @@ function relativeToRoot(filePath) {
 
 function assertPolicy(policy) {
   requireCondition(policy?.schema_version === "policy-evaluation-v1", "policy.schema_version moet policy-evaluation-v1 zijn");
-  requireCondition(typeof policy.evaluation_id === "string" && policy.evaluation_id.length >= 3, "policy.evaluation_id ontbreekt");
-  requireCondition(typeof policy.request_id === "string" && policy.request_id.length >= 3, "policy.request_id ontbreekt");
+  assertSafeIdentifier(policy.evaluation_id, "policy.evaluation_id");
+  assertSafeIdentifier(policy.request_id, "policy.request_id");
   requireCondition(policy.source_context?.project_id === "project-checklist", "policy source_context.project_id klopt niet");
   requireCondition(typeof policy.source_context?.source_set_version === "string", "policy source_set_version ontbreekt");
   requireCondition(HEX64.test(policy.source_context?.manifest_sha256 || ""), "policy manifest_sha256 ontbreekt");
@@ -47,7 +44,7 @@ function assertPolicy(policy) {
   requireCondition(policy.scope && typeof policy.scope.label === "string" && Array.isArray(policy.scope.included) && policy.scope.included.length > 0 && Array.isArray(policy.scope.excluded), "policy.scope is onvolledig");
   requireCondition(Array.isArray(policy.rounds) && policy.rounds.length > 0, "policy.rounds ontbreekt");
   for (const round of policy.rounds) {
-    requireCondition(typeof round.request_id === "string" && round.request_id.length >= 3, "policy round request_id ontbreekt");
+    assertSafeIdentifier(round.request_id, "policy round request_id");
     requireCondition(ROUND_STATUSES.has(round.status), `ongeldige round status voor ${round.request_id}`);
   }
   requireCondition(Array.isArray(policy.findings), "policy.findings moet een array zijn");
@@ -60,6 +57,7 @@ function assertPolicy(policy) {
     }
   }
   requireCondition(Array.isArray(policy.required_runtime_ids), "policy.required_runtime_ids moet een array zijn");
+  requireCondition(policy.required_runtime_ids.length === new Set(policy.required_runtime_ids).size, "policy.required_runtime_ids bevat duplicaten");
   requireCondition(Array.isArray(policy.in_scope_unexecuted_ids), "policy.in_scope_unexecuted_ids moet een array zijn");
   requireCondition(Array.isArray(policy.false_positives || []), "policy.false_positives moet een array zijn");
   requireCondition(RELEASE_DECISIONS.has(policy.release_decision), "policy.release_decision is ongeldig");
@@ -71,9 +69,7 @@ function assertPolicy(policy) {
     requireCondition(EXPERIENCES.has(policy.surface.experience ?? null), "policy.surface.experience is ongeldig");
     requireCondition(HOSTS.has(policy.surface.host ?? null), "policy.surface.host is ongeldig");
     requireCondition(MATRIX_SURFACES.has(policy.surface.runtime_surface ?? null), "policy.surface.runtime_surface is ongeldig");
-    if (policy.surface.app_connectors !== undefined) {
-      requireCondition(typeof policy.surface.app_connectors === "boolean", "policy.surface.app_connectors moet boolean zijn");
-    }
+    if (policy.surface.app_connectors !== undefined) requireCondition(typeof policy.surface.app_connectors === "boolean", "policy.surface.app_connectors moet boolean zijn");
   }
 }
 
@@ -87,7 +83,7 @@ function assertRawMatchesPolicy(raw, policy) {
 }
 
 function evidenceId(roundId, rawEvidenceId) {
-  return `${safeId(roundId)}--${rawEvidenceId}`;
+  return `${roundId}--${rawEvidenceId}`;
 }
 
 function normalizeEvidence(raw, roundId) {
@@ -117,6 +113,7 @@ function runtimeCandidates(raw, roundId) {
   candidates.push({ id: "RT-BROWSER-MOBILE", category: "device", component: "Chromium mobiele viewportemulatie", target: raw.final_url, execution_mode: "emulated", passed: hasEvidence("EV-BROWSER-MOBILE"), evidence_ids: hasEvidence("EV-BROWSER-MOBILE") ? [evidenceId(roundId, "EV-BROWSER-MOBILE")] : [], limitation: "Viewportemulatie is geen echt mobiel apparaat of echte Safari/iOS." });
   candidates.push({ id: "RT-KEYBOARD-ZOOM-SCREENREADER", category: "assistive_technology", component: "keyboard, zoom en screenreader", target: raw.final_url, execution_mode: "not_executed", passed: false, evidence_ids: [], limitation: observations.get("A11Y-MANUAL")?.note || "Aparte echte browser/input/AT-test nodig." });
   candidates.push({ id: "RT-REAL-IOS", category: "device", component: "echt mobiel apparaat / echte Safari-iOS", target: raw.final_url, execution_mode: "not_executed", passed: false, evidence_ids: [], limitation: "Niet uitvoerbaar in deze remote read-only GitHub Actions runner." });
+  candidates.push({ id: "RT-STAGING", category: "infrastructure", component: "representatieve staging met integraties en rollback", target: raw.final_url, execution_mode: "not_executed", passed: false, evidence_ids: [], limitation: "Een publieke URL-observatie bewijst geen representatieve staging, database/rollen/integraties of rollback." });
   if (observations.has("RUNTIME-CROSS-BROWSER")) candidates.push({ id: "RT-CROSS-BROWSER", category: "browser", component: "Firefox en WebKit/Safari-afdekking", target: raw.final_url, execution_mode: "not_executed", passed: false, evidence_ids: [], limitation: "Deze runner voert alleen Chromium uit." });
   return candidates;
 }
@@ -186,11 +183,10 @@ const policy = await readJson(policyPath);
 assertPolicy(policy);
 const rounds = [];
 for (const round of policy.rounds) {
-  const roundId = safeId(round.request_id);
-  const raw = await readJson(path.join(runsDir, `${roundId}.json`));
+  const raw = await readJson(path.join(runsDir, `${round.request_id}.json`));
   requireCondition(raw.request?.request_id === round.request_id, `run history mismatch voor ${round.request_id}`);
   assertRawMatchesPolicy(raw, policy);
-  rounds.push({ policy_round: round, raw, roundId });
+  rounds.push({ policy_round: round, raw, roundId: round.request_id });
 }
 
 const latest = rounds.at(-1);
@@ -213,10 +209,14 @@ const formalRounds = rounds.map((item, index) => ({ round: index + 1, status: it
 
 const matrix = buildRuntimeMatrix(latest.raw, policy, latest.raw.request.request_id);
 const evidenceLevels = new Set((latest.raw.evidence_registry || []).map((item) => item.evidence_level));
-const evidenceLevel = evidenceLevels.has("production_observation") ? "production_observation" : evidenceLevels.has("controlled_runtime") ? "controlled_runtime" : "source";
+const evidenceLevel = evidenceLevels.has("production_observation") ? "production_observation" : evidenceLevels.has("staging") ? "staging" : evidenceLevels.has("browser_at") ? "browser_at" : evidenceLevels.has("controlled_runtime") ? "controlled_runtime" : "source";
 const inScopeUnexecuted = new Set(policy.in_scope_unexecuted_ids);
 const unexecutedTests = (latest.raw.unexecuted_tests || []).filter((item) => inScopeUnexecuted.has(item.id));
 for (const id of inScopeUnexecuted) requireCondition((latest.raw.unexecuted_tests || []).some((item) => item.id === id), `policy noemt onbekende unexecuted test ${id}`);
+
+const hasDesktopBrowser = (latest.raw.evidence_registry || []).some((item) => item.id === "EV-BROWSER-DESKTOP");
+const hasMobileBrowser = (latest.raw.evidence_registry || []).some((item) => item.id === "EV-BROWSER-MOBILE");
+const hasBrowserHarness = hasDesktopBrowser || hasMobileBrowser;
 
 const manifest = {
   schema_version: "3.0",
@@ -227,9 +227,9 @@ const manifest = {
   scope: policy.scope,
   evidence_level: evidenceLevel,
   capabilities: {
-    public_browser: true,
+    public_browser: hasBrowserHarness,
     authenticated_browser: false,
-    browser_emulation: Boolean((latest.raw.evidence_registry || []).some((item) => item.id === "EV-BROWSER-MOBILE")),
+    browser_emulation: hasMobileBrowser,
     real_device: false,
     assistive_technology: false,
     staging_access: false,
@@ -237,17 +237,17 @@ const manifest = {
     limitations: latest.raw.limitations || [],
     experience: policy.surface?.experience ?? null,
     host: policy.surface?.host ?? null,
-    cloud_browser: false,
+    cloud_browser: hasBrowserHarness,
     local_files: false,
     local_repository: false,
     terminal_commands: false,
-    browser_harness: true,
+    browser_harness: hasBrowserHarness,
     desktop_app_control: false,
     app_connectors: policy.surface?.app_connectors ?? null
   },
   tool_versions: { runner: latest.raw.runner?.version || "unknown", ...latest.raw.tool_versions },
-  scan_configuration: { config_hash: latest.raw.configuration_hash, level: latest.raw.request.level, source_set_version: latest.raw.source_context.source_set_version, manifest_sha256: latest.raw.source_context.manifest_sha256, evidence_schema_sha256: policy.schema_hashes.evidence_manifest, runtime_schema_sha256: policy.schema_hashes.runtime_matrix },
-  environment: { runner_host: "github-actions", target: latest.raw.final_url, source_project: "project-checklist" },
+  scan_configuration: { config_hash: latest.raw.configuration_hash, level: latest.raw.request.level, target_environment: latest.raw.request.target_environment || null, source_set_version: latest.raw.source_context.source_set_version, manifest_sha256: latest.raw.source_context.manifest_sha256, evidence_schema_sha256: policy.schema_hashes.evidence_manifest, runtime_schema_sha256: policy.schema_hashes.runtime_matrix },
+  environment: { runner_host: "github-actions", target: latest.raw.final_url, target_environment: latest.raw.request.target_environment || null, source_project: "project-checklist" },
   baseline_contract_hash: contractHash,
   runtime_matrix: matrix,
   evidence_registry: registry,
