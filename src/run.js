@@ -77,7 +77,7 @@ function buildEvidenceRegistry(result) {
     }
   ];
 
-  if (result.network_evidence.link_sample.length) {
+  if (result.observations.some((item) => item.id === "LINK-001")) {
     registry.push({
       id: "EV-LINK-SAMPLE",
       type: "report",
