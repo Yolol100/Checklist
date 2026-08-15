@@ -1,12 +1,13 @@
 {
   "name": "webactueel-checklist-qa",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
-  "description": "Read-only Webactueel checklist runner executed automatically by GitHub Actions.",
+  "description": "Read-only evidence runner for the Webactueel Website QA Skill, executed by GitHub Actions.",
   "scripts": {
     "scan": "node src/run.js",
-    "check": "node --check src/net.js && node --check src/browser.js && node --check src/checklist.js && node --check src/run.js"
+    "validate-result": "node src/validate-result.js results/latest.json",
+    "check": "node --check src/net.js && node --check src/artifacts.js && node --check src/browser.js && node --check src/checklist.js && node --check src/run.js && node --check src/validate-result.js"
   },
   "dependencies": {
     "axe-core": "4.12.1",

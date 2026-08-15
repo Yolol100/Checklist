@@ -1,7 +1,25 @@
 {
-  "request_id": "smoke-v0.3-browser-20260815-1426z",
-  "url": "https://example.com",
+  "request_id": "fixture-v0.4-source-first",
+  "url": "https://example.com/",
   "level": "standard",
-  "requested_at": "2026-08-15T14:26:00Z",
-  "requested_by": "ChatGPT"
+  "task_type": "audit",
+  "requested_at": "2026-08-15T15:12:00Z",
+  "requested_by": "ChatGPT",
+  "source_context": {
+    "project_id": "project-checklist",
+    "source_set_version": "2026-08-14.1-reconnaissance-before-action",
+    "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46",
+    "selection_basis": "Website QA Skill preflight for a standard public read-only audit using the registered GitHub connector and remote GitHub Actions browser runner.",
+    "selected_sources": [
+      "active/00-project-index-en-router.md",
+      "active/01-qa-proces-en-severity.md",
+      "active/02-frontend-responsive-accessibility.md",
+      "active/04-seo-indexatie-en-migratie.md",
+      "active/08-security-en-technische-risicos.md",
+      "active/11-evidence-levels-runtime-matrix.md",
+      "support/82-tool-en-browsermatrix.md",
+      "support/87-master-project-checklist.md",
+      "support/88-playwright-axe-adapter.md"
+    ]
+  }
 }
