@@ -13,7 +13,7 @@ permissions:
 jobs:
   checklist:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,21 +37,26 @@ jobs:
             exit 1
           fi
           REQUEST_PATH="${FILES[0]}"
+          node - "$REQUEST_PATH" "$GITHUB_OUTPUT" <<'NODE'
+          const fs = require('fs');
+          const [p, out] = process.argv.slice(2);
+          const r = JSON.parse(fs.readFileSync(p, 'utf8'));
+          const id = String(r.request_id || '');
+          if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/.test(id)) throw new Error('Invalid request_id');
+          if (p.split('/').pop().replace(/\.json$/, '') !== id) throw new Error('Queue filename must equal request_id');
+          if (!['quick','standard','full'].includes(r.level)) throw new Error('Invalid level');
+          if (!['audit','live_smoke','release_verification'].includes(r.task_type)) throw new Error('Invalid task_type');
+          const url = new URL(String(r.url || ''));
+          if (url.search || url.hash || !['http:','https:'].includes(url.protocol)) throw new Error('Request URL must be queryless public HTTP(S) target');
+          for (const [key, value] of Object.entries({ request_path:p, request_id:id, level:r.level, task_type:r.task_type, target_url:url.href })) {
+            fs.appendFileSync(out, `${key}=${value}\n`);
+          }
+          NODE
           REQUEST_ID="$(node -e 'const fs=require("fs"); const p=process.argv[1]; const r=JSON.parse(fs.readFileSync(p,"utf8")); process.stdout.write(String(r.request_id||""));' "$REQUEST_PATH")"
-          if ! [[ "$REQUEST_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$ ]]; then
-            echo "Invalid request_id." >&2
-            exit 1
-          fi
-          if [ "$(basename "$REQUEST_PATH" .json)" != "$REQUEST_ID" ]; then
-            echo "Queue filename must equal request_id." >&2
-            exit 1
-          fi
           if [ -e "results/runs/$REQUEST_ID.json" ]; then
             echo "Immutable result already exists for $REQUEST_ID." >&2
             exit 1
           fi
-          echo "request_path=$REQUEST_PATH" >> "$GITHUB_OUTPUT"
-          echo "request_id=$REQUEST_ID" >> "$GITHUB_OUTPUT"
 
       - name: Install locked dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -59,13 +64,59 @@ jobs:
       - name: Install Chromium
         run: node node_modules/playwright/cli.js install --with-deps chromium
 
+      - name: Install Firefox and WebKit for standard/full/release
+        if: steps.request.outputs.level != 'quick' || steps.request.outputs.task_type == 'release_verification'
+        run: node node_modules/playwright/cli.js install --with-deps firefox webkit
+
       - name: Validate runner
         run: npm run check
 
-      - name: Run checklist evidence collection
+      - name: Run primary checklist evidence collection
         env:
           CHECKLIST_PERSIST_BROWSER_ARTIFACTS: "0"
         run: node src/run.js "${{ steps.request.outputs.request_path }}"
+
+      - name: Run supplemental cross-browser and bounded link checks
+        run: node src/supplemental.js "${{ steps.request.outputs.request_path }}"
+
+      - name: Set up Java 17 for local Nu Checker
+        if: steps.request.outputs.level == 'full' || steps.request.outputs.task_type == 'release_verification'
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Run pinned local Nu HTML Checker
+        if: steps.request.outputs.level == 'full' || steps.request.outputs.task_type == 'release_verification'
+        env:
+          VNU_ASSET_ID: "515207969"
+          VNU_SHA256: "c70279e260e5f4f9e95b3890ef6c9548f90ebdaec2a75219ec41694ab6241e34"
+          TARGET_URL: ${{ steps.request.outputs.target_url }}
+        run: |
+          mkdir -p reports tools
+          curl -fsSL \
+            -H "Accept: application/octet-stream" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/validator/validator/releases/assets/${VNU_ASSET_ID}" \
+            -o tools/vnu.jar
+          echo "${VNU_SHA256}  tools/vnu.jar" | sha256sum -c -
+          java -jar tools/vnu.jar --exit-zero-always --stdout --format json "$TARGET_URL" > reports/vnu.json
+          test -s reports/vnu.json
+
+      - name: Install pinned Lighthouse CI
+        if: steps.request.outputs.level == 'full' || steps.request.outputs.task_type == 'release_verification'
+        run: npm install --global @lhci/cli@0.15.1
+
+      - name: Run Lighthouse lab diagnosis
+        if: steps.request.outputs.level == 'full' || steps.request.outputs.task_type == 'release_verification'
+        env:
+          TARGET_URL: ${{ steps.request.outputs.target_url }}
+        run: |
+          export CHROME_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")"
+          lhci collect --url="$TARGET_URL" --numberOfRuns=1
+
+      - name: Merge supplemental evidence
+        run: node src/append-supplemental.js "${{ steps.request.outputs.request_path }}"
 
       - name: Validate raw evidence contract
         run: node src/validate-result.js results/latest.json
