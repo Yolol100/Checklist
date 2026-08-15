@@ -120,7 +120,7 @@ function buildEvidenceRegistry(result) {
       created_at: createdAt,
       environment,
       scope: result.final_url,
-      evidence_level: "production_observation",
+      evidence_level: "controlled_runtime",
       execution_mode: run.viewport === "mobile" ? "emulated" : "synthetic",
       sha256: sha256Json({
         status_code: run.status_code,
@@ -142,7 +142,7 @@ function buildEvidenceRegistry(result) {
         created_at: axe.created_at,
         environment,
         scope: `${result.final_url} (${run.viewport})`,
-        evidence_level: "production_observation",
+        evidence_level: "controlled_runtime",
         execution_mode: run.viewport === "mobile" ? "emulated" : "synthetic",
         sha256: axe.sha256
       });
@@ -151,7 +151,7 @@ function buildEvidenceRegistry(result) {
     for (const file of files) {
       registry.push({
         ...file,
-        evidence_level: "production_observation",
+        evidence_level: "controlled_runtime",
         execution_mode: run.viewport === "mobile" ? "emulated" : "synthetic"
       });
     }
