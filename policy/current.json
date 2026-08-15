@@ -1,0 +1,67 @@
+{
+  "schema_version": "policy-evaluation-v1",
+  "evaluation_id": "QA-INTEGRATION-v0.5-main",
+  "request_id": "fixture-v0.5-source-bound",
+  "source_context": {
+    "project_id": "project-checklist",
+    "source_set_version": "2026-08-14.1-reconnaissance-before-action",
+    "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46"
+  },
+  "schema_hashes": {
+    "evidence_manifest": "a43fe9183e2141d2d9efc3b0192e399d7fff7433374542699ea59660c4af59e1",
+    "runtime_matrix": "9c6c6660e02193d126efbeb75b4943c5d7a82c1401852e69f6b72b9ee4576eb2"
+  },
+  "surface": {
+    "experience": "chat",
+    "host": "web",
+    "runtime_surface": "chat-web",
+    "app_connectors": true
+  },
+  "scope": {
+    "label": "Integratievalidatie Checklist runner v0.5 op main",
+    "included": [
+      "source-bound raw requestacceptatie",
+      "publieke HTTP evidencecollectie",
+      "Chromium desktop rendered-UI readiness en artifacts",
+      "Chromium mobiele viewportemulatie en artifacts",
+      "raw-evidence-v1 validatie",
+      "deterministische policy-evaluation naar Evidence Manifest 3.0 en Runtime Matrix 2.0"
+    ],
+    "excluded": [
+      "inhoudelijk releaseoordeel over example.com",
+      "security-, SEO- of toegankelijkheidsacceptatie van example.com",
+      "authenticated flows",
+      "formulierinzendingen en betalingen",
+      "echt apparaat, echte Safari/iOS en assistive technology"
+    ]
+  },
+  "runtime_selection_basis": "Voor deze integratievalidatie moeten de publieke HTTP-laag en beide geïmplementeerde Chromium-runtimes aantoonbaar zijn uitgevoerd; hogere handmatige lagen vallen expliciet buiten deze testscope.",
+  "required_runtime_ids": [
+    "RT-PUBLIC-HTTP",
+    "RT-BROWSER-DESKTOP",
+    "RT-BROWSER-MOBILE"
+  ],
+  "in_scope_unexecuted_ids": [],
+  "findings": [],
+  "false_positives": [],
+  "rounds": [
+    {
+      "request_id": "fixture-v0.5-source-bound",
+      "status": "passed"
+    }
+  ],
+  "rollback": {
+    "available": false,
+    "tested": false,
+    "plan": "Niet van toepassing: deze policy valideert uitsluitend een read-only integratierun en wijzigt de geteste website niet.",
+    "owner": "website-qa-checklist",
+    "evidence_ids": []
+  },
+  "monitoring": {
+    "ready": false,
+    "plan": "Geen livegangclaim binnen deze integratiescope; workflow- en CI-status zijn apart gecontroleerd.",
+    "owner": "website-qa-checklist",
+    "evidence_ids": []
+  },
+  "release_decision": "conditional_go"
+}
