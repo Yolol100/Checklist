@@ -59,3 +59,18 @@ jobs:
         run: node src/finalize.js policy/fixture.json results/formal-ci.json
       - name: Validate formal Evidence Manifest 3.0 semantics
         run: node src/validate-formal.js results/formal-ci.json
+      - name: Verify full Go is blocked without staging capability
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const source = JSON.parse(fs.readFileSync('results/formal-ci.json', 'utf8'));
+          const evidenceId = source.evidence_registry[0].id;
+          source.release_decision = 'go';
+          source.rollback = { available: true, tested: true, plan: 'negative gate fixture', owner: 'website-qa-checklist', evidence_ids: [evidenceId] };
+          source.monitoring = { ready: true, plan: 'negative gate fixture', owner: 'website-qa-checklist', evidence_ids: [evidenceId] };
+          fs.writeFileSync('results/formal-unsafe-go.json', `${JSON.stringify(source, null, 2)}\n`);
+          NODE
+          if node src/validate-formal.js results/formal-unsafe-go.json; then
+            echo "Unsafe Go was incorrectly accepted."
+            exit 1
+          fi
