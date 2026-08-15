@@ -36,7 +36,7 @@ jobs:
           test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/axe.json
           test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/dom-inventory.json
           test -f artifacts/runs/fixture-v0.5-source-bound/browser/mobile/trace.zip
-      - name: Build formal evidence manifest from policy evaluation
-        run: npm run finalize
+      - name: Build formal evidence manifest from isolated policy fixture
+        run: node src/finalize.js policy/fixture.json results/formal-ci.json
       - name: Validate formal Evidence Manifest 3.0 semantics
-        run: npm run validate-formal
+        run: node src/validate-formal.js results/formal-ci.json
