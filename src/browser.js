@@ -22,6 +22,7 @@ const BROWSER_CONFIG = {
   timezoneId: "Europe/Amsterdam",
   reducedMotion: "reduce",
   serviceWorkers: "block",
+  httpMethods: ["GET", "HEAD"],
   webSockets: "blocked",
   dnsPinningProxy: true,
   webRtcIpHandlingPolicy: "disable_non_proxied_udp",
@@ -46,8 +47,10 @@ function compactAxeViolations(violations) {
 
 async function installPublicRequestGuard(context) {
   const blockedWebSockets = [];
+  const blockedWriteRequests = [];
   await context.route("**/*", async (route) => {
     const request = route.request();
+    const method = request.method().toUpperCase();
     let parsed;
     try { parsed = new URL(request.url()); } catch {
       await route.abort("blockedbyclient");
@@ -58,6 +61,11 @@ async function installPublicRequestGuard(context) {
       return;
     }
     if (!["http:", "https:"].includes(parsed.protocol)) {
+      await route.abort("blockedbyclient");
+      return;
+    }
+    if (!["GET", "HEAD"].includes(method)) {
+      blockedWriteRequests.push({ method, url: sanitizeUrlForEvidence(parsed) });
       await route.abort("blockedbyclient");
       return;
     }
@@ -72,7 +80,7 @@ async function installPublicRequestGuard(context) {
     blockedWebSockets.push(sanitizeUrlForEvidence(webSocketRoute.url()));
     await webSocketRoute.close({ code: 1008, reason: "Blocked by read-only QA runner" });
   });
-  return { blockedWebSockets };
+  return { blockedWebSockets, blockedWriteRequests };
 }
 
 async function waitForMeaningfulReadiness(page) {
@@ -257,6 +265,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
       request_failures: requestFailures.slice(0, 20),
       mixed_content_requests: sanitizeUrlList(mixedContentRequests, 20),
       websocket_requests: sanitizeUrlList(networkGuard.blockedWebSockets, 20),
+      blocked_write_requests: networkGuard.blockedWriteRequests.slice(0, 20),
       artifact_entries: artifactEntries
     };
   } finally {
@@ -295,7 +304,7 @@ export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoo
       browser: "chromium",
       browser_configuration: BROWSER_CONFIG,
       viewports: VIEWPORTS,
-      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. HTTP(S)-egress gaat via een lokale DNS-pinning proxy; Service Workers, WebSocket-egress, non-proxied WebRTC UDP en QUIC zijn geblokkeerd. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
+      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. HTTP(S)-egress gaat via een lokale DNS-pinning proxy; alleen GET/HEAD zijn toegestaan en Service Workers, WebSocket-egress, non-proxied WebRTC UDP en QUIC zijn geblokkeerd. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
       runs
     };
   } finally {
