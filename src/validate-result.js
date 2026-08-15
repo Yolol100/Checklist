@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 const filePath = process.argv[2] || "results/latest.json";
 const payload = JSON.parse(await fs.readFile(filePath, "utf8"));
 const errors = [];
+const HEX64 = /^[a-f0-9]{64}$/i;
 
 function requireCondition(condition, message) {
   if (!condition) errors.push(message);
@@ -12,16 +13,37 @@ requireCondition(payload.schema_version === "raw-evidence-v1", "schema_version m
 requireCondition(Boolean(payload.request?.request_id), "request.request_id ontbreekt");
 requireCondition(payload.source_context?.project_id === "project-checklist", "source_context.project_id klopt niet");
 requireCondition(Boolean(payload.source_context?.source_set_version), "source_context.source_set_version ontbreekt");
-requireCondition(/^[a-f0-9]{64}$/i.test(payload.source_context?.manifest_sha256 || ""), "manifest_sha256 ontbreekt of is ongeldig");
+requireCondition(HEX64.test(payload.source_context?.manifest_sha256 || ""), "manifest_sha256 ontbreekt of is ongeldig");
+requireCondition(payload.source_context?.source_hashes && typeof payload.source_context.source_hashes === "object", "source_context.source_hashes ontbreekt");
+for (const source of payload.source_context?.selected_sources || []) {
+  requireCondition(HEX64.test(payload.source_context?.source_hashes?.[source] || ""), `bronhash ontbreekt/ongeldig voor ${source}`);
+}
+requireCondition(HEX64.test(payload.source_context?.source_hashes?.["support/83-evidence-manifest-schema.json"] || ""), "evidence-manifest schemahash ontbreekt");
+requireCondition(HEX64.test(payload.source_context?.source_hashes?.["support/84-runtime-matrix-schema.json"] || ""), "runtime-matrix schemahash ontbreekt");
 requireCondition(payload.runner?.contract === "raw-evidence-v1", "runner.contract klopt niet");
 requireCondition(payload.runner?.mutation_performed === false, "runner mag geen targetmutatie rapporteren");
+requireCondition(HEX64.test(payload.configuration_hash || ""), "configuration_hash ontbreekt/ongeldig");
+requireCondition(HEX64.test(payload.artifact_fingerprint_sha256 || ""), "artifact_fingerprint_sha256 ontbreekt/ongeldig");
 requireCondition(payload.policy_evaluation === null, "policy_evaluation moet null blijven in de runner");
 requireCondition(!Object.hasOwn(payload, "decision"), "runner mag geen decision veld produceren");
 requireCondition(Array.isArray(payload.observations) && payload.observations.length > 0, "observations ontbreken");
 requireCondition(Array.isArray(payload.evidence_registry) && payload.evidence_registry.length > 0, "evidence_registry ontbreekt");
 requireCondition(payload.final_evidence_contract?.schema === "support/83-evidence-manifest-schema.json", "formeel evidence-contract ontbreekt");
+requireCondition(payload.final_evidence_contract?.runtime_schema === "support/84-runtime-matrix-schema.json", "formeel runtime-contract ontbreekt");
+requireCondition(payload.final_evidence_contract?.policy_input === "policy/current.json", "policy input-contract ontbreekt");
 
-const evidenceIds = new Set((payload.evidence_registry || []).map((item) => item.id));
+const evidenceIds = new Set();
+for (const evidence of payload.evidence_registry || []) {
+  requireCondition(typeof evidence.id === "string" && evidence.id.length >= 3, "evidence-id ontbreekt");
+  requireCondition(!evidenceIds.has(evidence.id), `dubbel evidence-id ${evidence.id}`);
+  evidenceIds.add(evidence.id);
+  if (evidence.sha256 !== null && evidence.sha256 !== undefined) {
+    requireCondition(HEX64.test(evidence.sha256), `evidence ${evidence.id} heeft ongeldige sha256`);
+  }
+  requireCondition(["production_observation", "controlled_runtime", "staging", "browser_at", "source"].includes(evidence.evidence_level), `evidence ${evidence.id} heeft ongeldige evidence_level`);
+  requireCondition(["real", "emulated", "synthetic", "not_executed"].includes(evidence.execution_mode), `evidence ${evidence.id} heeft ongeldige execution_mode`);
+}
+
 for (const item of payload.observations || []) {
   for (const forbidden of ["status", "priority", "confidence", "decision", "severity"]) {
     requireCondition(!Object.hasOwn(item, forbidden), `observation ${item.id} bevat verboden beleidsveld ${forbidden}`);
@@ -33,13 +55,12 @@ for (const item of payload.observations || []) {
   }
 }
 
-for (const evidence of payload.evidence_registry || []) {
-  if (evidence.sha256 !== null && evidence.sha256 !== undefined) {
-    requireCondition(/^[a-f0-9]{64}$/i.test(evidence.sha256), `evidence ${evidence.id} heeft ongeldige sha256`);
-  }
-  requireCondition(["production_observation", "controlled_runtime", "staging", "browser_at", "source"].includes(evidence.evidence_level), `evidence ${evidence.id} heeft ongeldige evidence_level`);
-  requireCondition(["real", "emulated", "synthetic", "not_executed"].includes(evidence.execution_mode), `evidence ${evidence.id} heeft ongeldige execution_mode`);
+const browserRuns = payload.runtime_observation?.browser_harness ? payload.evidence_registry.filter((item) => item.id.startsWith("EV-BROWSER-")) : [];
+for (const browserEvidence of browserRuns) {
+  requireCondition(browserEvidence.evidence_level === "controlled_runtime", `${browserEvidence.id} moet controlled_runtime blijven`);
 }
+const mobile = payload.evidence_registry.find((item) => item.id === "EV-BROWSER-MOBILE");
+if (mobile) requireCondition(mobile.execution_mode === "emulated", "EV-BROWSER-MOBILE moet emulated zijn");
 
 if (errors.length) {
   console.error("Resultaatvalidatie mislukt:");

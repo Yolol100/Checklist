@@ -18,7 +18,7 @@ const SOURCE_REFS = {
   forms: ["active/03-formulieren-email-en-crm.md"],
   links: ["active/04-seo-indexatie-en-migratie.md"],
   performance: ["active/06-wordpress-elementor-en-performance.md", "support/82-tool-en-browsermatrix.md"],
-  runtime: ["active/11-evidence-levels-runtime-matrix.md", "support/82-tool-en-browsermatrix.md"]
+  runtime: ["active/11-evidence-levels-runtime-matrix.md", "support/82-tool-en-browsermatrix.md", "support/88-playwright-axe-adapter.md"]
 };
 
 function observation({ id, category, title, outcome, data, evidenceIds = [], sourceRefs, note }) {
@@ -76,9 +76,9 @@ function absoluteUrl(href, base) {
 
 async function checkLink(url, timeoutMs = 7000) {
   try {
-    let result = await safeFetch(url, { method: "HEAD", timeoutMs, headers: { "user-agent": "Webactueel-Checklist-QA/0.4 (+read-only evidence runner)" } });
+    let result = await safeFetch(url, { method: "HEAD", timeoutMs, headers: { "user-agent": "Webactueel-Checklist-QA/0.5 (+read-only evidence runner)" } });
     if (result.response.status === 405 || result.response.status === 403) {
-      result = await safeFetch(url, { method: "GET", timeoutMs, headers: { "user-agent": "Webactueel-Checklist-QA/0.4 (+read-only evidence runner)" } });
+      result = await safeFetch(url, { method: "GET", timeoutMs, headers: { "user-agent": "Webactueel-Checklist-QA/0.5 (+read-only evidence runner)" } });
     }
     return { url, final_url: result.finalUrl, status: result.response.status, ok: result.response.status < 400 };
   } catch (error) {
@@ -92,7 +92,7 @@ async function collectRobots(finalUrl) {
     const { response, finalUrl: observedUrl } = await safeFetch(robotsUrl, {
       method: "GET",
       timeoutMs: 8000,
-      headers: { "user-agent": "Webactueel-Checklist-QA/0.4 (+read-only evidence runner)" }
+      headers: { "user-agent": "Webactueel-Checklist-QA/0.5 (+read-only evidence runner)" }
     });
     const text = response.status === 200 ? await readTextLimited(response, 250_000) : "";
     return {
@@ -140,20 +140,37 @@ function browserObservations(browserEvidence, level) {
     evidenceIds: successful.flatMap((run) => evidenceFor(run.viewport))
   }));
 
+  const readinessTimedOut = successful.some((run) => run.readiness?.quiescence_reason === "max_wait_reached");
+  observations.push(observation({
+    id: "RUNTIME-UI-READINESS",
+    category: "runtime",
+    title: "Gerenderde UI-readiness vóór inspectie",
+    outcome: readinessTimedOut ? OUTCOME.INTERPRET : OUTCOME.OK,
+    data: {
+      by_viewport: successful.map((run) => ({ viewport: run.viewport, readiness: run.readiness || null }))
+    },
+    evidenceIds: successful.flatMap((run) => evidenceFor(run.viewport)),
+    note: readinessTimedOut
+      ? "Body was zichtbaar, maar mutation-quiescence bereikte de maximale wachttijd; interpreteer dynamische DOM-resultaten met die beperking."
+      : "Inspectie startte pas na zichtbare body en een mutation-quiescence venster; geen networkidle- of blind-sleepclaim."
+  }));
+
   const totalViolations = successful.reduce((sum, run) => sum + (run.axe?.violation_count || 0), 0);
   const serious = successful.reduce((sum, run) => sum + (run.axe?.serious_or_critical_count || 0), 0);
+  const incomplete = successful.reduce((sum, run) => sum + (run.axe?.incomplete || 0), 0);
   observations.push(observation({
     id: "A11Y-AUTO",
     category: "accessibility",
     title: "Geautomatiseerde axe-observatie",
-    outcome: totalViolations === 0 ? OUTCOME.OK : OUTCOME.ISSUE,
+    outcome: totalViolations > 0 ? OUTCOME.ISSUE : incomplete > 0 ? OUTCOME.INTERPRET : OUTCOME.OK,
     data: {
       violation_count: totalViolations,
       serious_or_critical_count: serious,
+      incomplete_count: incomplete,
       by_viewport: successful.map((run) => ({ viewport: run.viewport, ...run.axe }))
     },
     evidenceIds: successful.flatMap((run) => evidenceFor(run.viewport, "axe")),
-    note: "Automatische axe-resultaten zijn aanvullend bewijs en geen formele WCAG-conformiteitsclaim."
+    note: "Automatische axe-resultaten zijn aanvullend bewijs; incomplete-resultaten vragen interpretatie en dit is geen formele WCAG-conformiteitsclaim."
   }));
 
   const desktop = successful.find((run) => run.viewport === "desktop") || successful[0];
@@ -219,6 +236,10 @@ function browserObservations(browserEvidence, level) {
   return observations;
 }
 
+function renderedDesktop(browserEvidence) {
+  return browserEvidence?.runs?.find((run) => run.viewport === "desktop" && !run.browser_error && run.dom) || null;
+}
+
 export async function runChecklist(rawUrl, level = "standard", artifactRoot = "artifacts/latest") {
   const startedAt = new Date().toISOString();
   const target = await assertPublicUrl(rawUrl, { allowQuery: false });
@@ -226,7 +247,7 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
     method: "GET",
     allowQuery: false,
     timeoutMs: 15_000,
-    headers: { "user-agent": "Webactueel-Checklist-QA/0.4 (+read-only evidence runner)" }
+    headers: { "user-agent": "Webactueel-Checklist-QA/0.5 (+read-only evidence runner)" }
   });
 
   const contentType = response.headers.get("content-type") || "";
@@ -281,113 +302,6 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
     }));
   }
 
-  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : "";
-  observations.push(observation({
-    id: "SEO-001",
-    category: "seo",
-    title: "HTML-title aanwezigheid",
-    outcome: title ? OUTCOME.OK : OUTCOME.ISSUE,
-    data: { title: title || null, length: title.length },
-    evidenceIds: ["EV-HTTP-MAIN"]
-  }));
-
-  const description = findMetaContent(html, "description");
-  observations.push(observation({
-    id: "SEO-002",
-    category: "seo",
-    title: "Meta description aanwezigheid",
-    outcome: description ? OUTCOME.OK : OUTCOME.ISSUE,
-    data: { description: description || null, length: description.length },
-    evidenceIds: ["EV-HTTP-MAIN"]
-  }));
-
-  const robotsMeta = findMetaContent(html, "robots");
-  const noindex = /(?:^|[,\s])noindex(?:[,\s]|$)/i.test(robotsMeta);
-  observations.push(observation({
-    id: "SEO-INDEX-001",
-    category: "seo",
-    title: "Meta robots/noindex observatie",
-    outcome: noindex ? OUTCOME.INTERPRET : OUTCOME.OK,
-    data: { robots_meta: robotsMeta || null, noindex },
-    evidenceIds: ["EV-HTTP-MAIN"]
-  }));
-
-  const canonical = findCanonical(html, finalUrl);
-  observations.push(observation({
-    id: "SEO-CANONICAL",
-    category: "seo",
-    title: "Canonical-link observatie",
-    outcome: canonical ? OUTCOME.OK : OUTCOME.INTERPRET,
-    data: { canonical },
-    evidenceIds: ["EV-HTTP-MAIN"],
-    note: "Afwezigheid is niet automatisch een fout; de SEO-bron bepaalt de verwachting voor deze URL."
-  }));
-
-  const h1Count = countMatches(html, /<h1\b[^>]*>/gi);
-  observations.push(observation({
-    id: "HTML-001",
-    category: "frontend",
-    title: "H1-aanwezigheid",
-    outcome: h1Count >= 1 ? OUTCOME.OK : OUTCOME.ISSUE,
-    data: { h1_count: h1Count },
-    evidenceIds: ["EV-HTTP-MAIN"]
-  }));
-
-  const imageCount = countMatches(html, /<img\b[^>]*>/gi);
-  const missingAltCount = [...html.matchAll(/<img\b([^>]*)>/gi)].filter((match) => !/\balt\s*=/.test(match[1])).length;
-  observations.push(observation({
-    id: "A11Y-001",
-    category: "accessibility",
-    title: "Afbeeldingen met alt-attribuut",
-    outcome: missingAltCount === 0 ? OUTCOME.OK : OUTCOME.ISSUE,
-    data: { image_count: imageCount, missing_alt_attribute_count: missingAltCount },
-    evidenceIds: ["EV-HTTP-MAIN"],
-    note: "Aanwezigheid zegt niets over de inhoudelijke juistheid van alt-tekst."
-  }));
-
-  const forms = countMatches(html, /<form\b[^>]*>/gi);
-  observations.push(observation({
-    id: "FORM-001",
-    category: "forms",
-    title: "Formulierflow functioneel uitgevoerd",
-    outcome: forms > 0 ? OUTCOME.NOT_EXECUTED : OUTCOME.NA,
-    data: { form_count: forms, submitted: false },
-    evidenceIds: ["EV-HTTP-MAIN"],
-    note: "De runner verstuurt nooit formulieren."
-  }));
-
-  let linkResults = [];
-  let robots = null;
-  if (level !== "quick") {
-    const baseHost = new URL(finalUrl).hostname;
-    const hrefs = [...html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>/gi)]
-      .map((match) => absoluteUrl(match[1], finalUrl))
-      .filter((url) => url && new URL(url).hostname === baseHost);
-    const uniqueLinks = [...new Set(hrefs)].slice(0, level === "full" ? 60 : 20);
-    linkResults = await Promise.all(uniqueLinks.map((url) => checkLink(url)));
-    const broken = linkResults.filter((item) => !item.ok);
-
-    observations.push(observation({
-      id: "LINK-001",
-      category: "links",
-      title: "Interne linksteekproef",
-      outcome: broken.length === 0 ? OUTCOME.OK : OUTCOME.ISSUE,
-      data: { tested_count: linkResults.length, broken_count: broken.length, broken: broken.slice(0, 20) },
-      evidenceIds: ["EV-LINK-SAMPLE"]
-    }));
-
-    robots = await collectRobots(finalUrl);
-    observations.push(observation({
-      id: "SEO-ROBOTS",
-      category: "seo",
-      title: "robots.txt observatie",
-      outcome: robots.blocks_all || !robots.status_code || robots.status_code >= 500 ? OUTCOME.INTERPRET : OUTCOME.OK,
-      data: robots,
-      evidenceIds: ["EV-ROBOTS"]
-    }));
-  }
-
   let browserEvidence;
   try {
     browserEvidence = await runBrowserEvidence(finalUrl, level, artifactRoot);
@@ -400,6 +314,128 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
       title: "Chromium browserharness uitgevoerd",
       outcome: OUTCOME.NOT_EXECUTED,
       data: browserEvidence
+    }));
+  }
+
+  const rendered = renderedDesktop(browserEvidence);
+  const renderedDom = rendered?.dom || null;
+  const domEvidenceIds = rendered ? ["EV-BROWSER-DESKTOP"] : ["EV-HTTP-MAIN"];
+  const domBasis = rendered ? "rendered_dom" : "server_html_fallback";
+
+  const serverTitleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const serverTitle = serverTitleMatch ? serverTitleMatch[1].replace(/\s+/g, " ").trim() : "";
+  const title = renderedDom?.title ?? serverTitle;
+  observations.push(observation({
+    id: "SEO-001",
+    category: "seo",
+    title: "Title aanwezigheid in bedoelde UI-state",
+    outcome: title ? OUTCOME.OK : OUTCOME.ISSUE,
+    data: { title: title || null, length: title?.length || 0, basis: domBasis },
+    evidenceIds: domEvidenceIds
+  }));
+
+  const description = renderedDom?.description ?? findMetaContent(html, "description");
+  observations.push(observation({
+    id: "SEO-002",
+    category: "seo",
+    title: "Meta description aanwezigheid in bedoelde UI-state",
+    outcome: description ? OUTCOME.OK : OUTCOME.ISSUE,
+    data: { description: description || null, length: description?.length || 0, basis: domBasis },
+    evidenceIds: domEvidenceIds
+  }));
+
+  const robotsMeta = renderedDom?.robots_meta ?? findMetaContent(html, "robots");
+  const noindex = /(?:^|[,\s])noindex(?:[,\s]|$)/i.test(robotsMeta || "");
+  observations.push(observation({
+    id: "SEO-INDEX-001",
+    category: "seo",
+    title: "Meta robots/noindex observatie",
+    outcome: noindex ? OUTCOME.INTERPRET : OUTCOME.OK,
+    data: { robots_meta: robotsMeta || null, noindex, basis: domBasis },
+    evidenceIds: domEvidenceIds
+  }));
+
+  const canonical = renderedDom?.canonical ?? findCanonical(html, finalUrl);
+  observations.push(observation({
+    id: "SEO-CANONICAL",
+    category: "seo",
+    title: "Canonical-link observatie",
+    outcome: canonical ? OUTCOME.OK : OUTCOME.INTERPRET,
+    data: { canonical, basis: domBasis },
+    evidenceIds: domEvidenceIds,
+    note: "Afwezigheid is niet automatisch een fout; de SEO-bron bepaalt de verwachting voor deze URL."
+  }));
+
+  const h1Count = renderedDom?.h1_count ?? countMatches(html, /<h1\b[^>]*>/gi);
+  observations.push(observation({
+    id: "HTML-001",
+    category: "frontend",
+    title: "H1-aanwezigheid in gerenderde UI-state",
+    outcome: h1Count >= 1 ? OUTCOME.OK : OUTCOME.ISSUE,
+    data: { h1_count: h1Count, basis: domBasis },
+    evidenceIds: domEvidenceIds
+  }));
+
+  const serverImageCount = countMatches(html, /<img\b[^>]*>/gi);
+  const serverMissingAltCount = [...html.matchAll(/<img\b([^>]*)>/gi)].filter((match) => !/\balt\s*=/.test(match[1])).length;
+  const imageCount = renderedDom?.image_count ?? serverImageCount;
+  const missingAltCount = renderedDom?.missing_alt_attribute_count ?? serverMissingAltCount;
+  observations.push(observation({
+    id: "A11Y-001",
+    category: "accessibility",
+    title: "Afbeeldingen met alt-attribuut in gerenderde UI-state",
+    outcome: missingAltCount === 0 ? OUTCOME.OK : OUTCOME.ISSUE,
+    data: { image_count: imageCount, missing_alt_attribute_count: missingAltCount, basis: domBasis },
+    evidenceIds: domEvidenceIds,
+    note: "Aanwezigheid zegt niets over de inhoudelijke juistheid van alt-tekst."
+  }));
+
+  const forms = renderedDom?.form_count ?? countMatches(html, /<form\b[^>]*>/gi);
+  observations.push(observation({
+    id: "FORM-001",
+    category: "forms",
+    title: "Formulierflow functioneel uitgevoerd",
+    outcome: forms > 0 ? OUTCOME.NOT_EXECUTED : OUTCOME.NA,
+    data: { form_count: forms, submitted: false, basis: domBasis },
+    evidenceIds: domEvidenceIds,
+    note: "De runner detecteert formulieren in de bedoelde UI-state maar verstuurt nooit formulieren."
+  }));
+
+  let linkResults = [];
+  let robots = null;
+  if (level !== "quick") {
+    const baseHost = new URL(finalUrl).hostname;
+    const renderedLinks = renderedDom?.internal_links || [];
+    const serverLinks = [...html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>/gi)]
+      .map((match) => absoluteUrl(match[1], finalUrl))
+      .filter((url) => url && new URL(url).hostname === baseHost);
+    const candidateLinks = renderedLinks.length ? renderedLinks : serverLinks;
+    const uniqueLinks = [...new Set(candidateLinks)].slice(0, level === "full" ? 60 : 20);
+    linkResults = await Promise.all(uniqueLinks.map((url) => checkLink(url)));
+    const broken = linkResults.filter((item) => !item.ok);
+
+    observations.push(observation({
+      id: "LINK-001",
+      category: "links",
+      title: "Interne linksteekproef",
+      outcome: broken.length === 0 ? OUTCOME.OK : OUTCOME.ISSUE,
+      data: {
+        tested_count: linkResults.length,
+        broken_count: broken.length,
+        broken: broken.slice(0, 20),
+        basis: renderedLinks.length ? "rendered_dom" : "server_html_fallback"
+      },
+      evidenceIds: renderedLinks.length ? ["EV-BROWSER-DESKTOP", "EV-LINK-SAMPLE"] : ["EV-LINK-SAMPLE"]
+    }));
+
+    robots = await collectRobots(finalUrl);
+    observations.push(observation({
+      id: "SEO-ROBOTS",
+      category: "seo",
+      title: "robots.txt observatie",
+      outcome: robots.blocks_all || !robots.status_code || robots.status_code >= 500 ? OUTCOME.INTERPRET : OUTCOME.OK,
+      data: robots,
+      evidenceIds: ["EV-ROBOTS"]
     }));
   }
 
@@ -432,7 +468,7 @@ export async function runChecklist(rawUrl, level = "standard", artifactRoot = "a
 
   return {
     runner: "webactueel-checklist-qa",
-    runner_version: "0.4.0",
+    runner_version: "0.5.0",
     contract: "raw-evidence-v1",
     level,
     target: target.href,

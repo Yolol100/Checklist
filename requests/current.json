@@ -1,15 +1,15 @@
 {
-  "request_id": "reaudit-20260815-1659z",
+  "request_id": "fixture-v0.5-source-bound",
   "url": "https://example.com/",
   "level": "standard",
   "task_type": "audit",
-  "requested_at": "2026-08-15T16:59:00Z",
+  "requested_at": "2026-08-15T17:35:00Z",
   "requested_by": "ChatGPT",
   "source_context": {
     "project_id": "project-checklist",
     "source_set_version": "2026-08-14.1-reconnaissance-before-action",
     "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46",
-    "selection_basis": "Independent re-audit of the integrated Website QA chain from ChatGPT Web through the connected GitHub app and remote GitHub Actions runner, after re-reading the live Project Checklist manifest and mandatory source set.",
+    "selection_basis": "CI fixture for a standard public read-only audit through the registered GitHub Actions browser runner after source-first preflight.",
     "selected_sources": [
       "active/00-project-index-en-router.md",
       "active/01-qa-proces-en-severity.md",
@@ -18,8 +18,23 @@
       "active/08-security-en-technische-risicos.md",
       "active/11-evidence-levels-runtime-matrix.md",
       "support/82-tool-en-browsermatrix.md",
+      "support/83-evidence-manifest-schema.json",
+      "support/84-runtime-matrix-schema.json",
       "support/87-master-project-checklist.md",
       "support/88-playwright-axe-adapter.md"
-    ]
+    ],
+    "source_hashes": {
+      "active/00-project-index-en-router.md": "5021928d21e2e689ece4b0a385cd38246a331ca4687302e706c794c9dcc5cd1d",
+      "active/01-qa-proces-en-severity.md": "787e2edb7b5d6bd07daabe2bacc8a91d801ea0561da6bc116be50138e53ed875",
+      "active/02-frontend-responsive-accessibility.md": "95eb14ddd6e6ee8975b40299938485ba304acb0f9cb70d002125960f7351ce8b",
+      "active/04-seo-indexatie-en-migratie.md": "d8015224dedbdffbd7901454dd7a757d0717c29a295a3d8c321fcf593487ce31",
+      "active/08-security-en-technische-risicos.md": "d245e70ac737d51307f48d01185403dfdce5062bbabb7622c9953e011732af52",
+      "active/11-evidence-levels-runtime-matrix.md": "bf118db2307a557b1a6bd8ea30d03a1c2b7b59751f362151e8c35756eebd0de9",
+      "support/82-tool-en-browsermatrix.md": "000e2409d5ca3000bb6a87117c97db22e10c64f5f6f2478ba06fceed932d313b",
+      "support/83-evidence-manifest-schema.json": "a43fe9183e2141d2d9efc3b0192e399d7fff7433374542699ea59660c4af59e1",
+      "support/84-runtime-matrix-schema.json": "9c6c6660e02193d126efbeb75b4943c5d7a82c1401852e69f6b72b9ee4576eb2",
+      "support/87-master-project-checklist.md": "ab40e46d4d0f682e0ea07cb152429c74a18061ab8e28b5ad3ebb6674b977790e",
+      "support/88-playwright-axe-adapter.md": "5b7cd22d78350e71e9baa9d67baf1f7cca120588e8c782bb015edfadfee35b59"
+    }
   }
 }
