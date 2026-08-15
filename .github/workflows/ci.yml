@@ -70,10 +70,65 @@ jobs:
           test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/axe.json
           test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/dom-inventory.json
           test -f artifacts/runs/final-e2e-v0.5-20260815-1755z/browser/mobile/trace.zip
-      - name: Build formal evidence manifest from isolated policy fixture
+      - name: Build formal evidence manifest from current policy fixture
         run: node src/finalize.js policy/fixture.json results/formal-ci.json
       - name: Validate formal Evidence Manifest 3.0 semantics
         run: node src/validate-formal.js results/formal-ci.json
+      - name: Validate formal cross-field hardening
+        run: node src/validate-formal-hardening.js results/formal-ci.json
+      - name: Verify no-browser raw evidence cannot overclaim browser capabilities
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const raw = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
+          raw.request.request_id = 'no-browser-capability';
+          raw.evidence_registry = raw.evidence_registry.filter((item) => !/^EV-(?:BROWSER|AXE|FILE-BROWSER)-/.test(item.id));
+          raw.runtime_observation.browser_harness = false;
+          raw.runtime_observation.browser_evidence = null;
+          raw.tool_versions = { runner_test_fixture: 'no-browser' };
+          fs.writeFileSync('results/runs/no-browser-capability.json', `${JSON.stringify(raw, null, 2)}\n`);
+          const policy = JSON.parse(fs.readFileSync('policy/fixture.json', 'utf8'));
+          policy.evaluation_id = 'QA-NO-BROWSER-v0.6';
+          policy.request_id = 'no-browser-capability';
+          policy.rounds = [{ request_id: 'no-browser-capability', status: 'passed' }];
+          policy.required_runtime_ids = ['RT-PUBLIC-HTTP'];
+          fs.writeFileSync('policy/no-browser-ci.json', `${JSON.stringify(policy, null, 2)}\n`);
+          NODE
+          node src/finalize.js policy/no-browser-ci.json results/formal-no-browser.json
+          node src/validate-formal.js results/formal-no-browser.json
+          node src/validate-formal-hardening.js results/formal-no-browser.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data = JSON.parse(fs.readFileSync('results/formal-no-browser.json', 'utf8'));
+          for (const key of ['public_browser', 'browser_harness', 'cloud_browser']) {
+            if (data.capabilities[key] !== false) throw new Error(`${key} was overclaimed`);
+          }
+          NODE
+      - name: Verify legacy target environment is rejected
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data = JSON.parse(fs.readFileSync('results/formal-ci.json', 'utf8'));
+          delete data.scan_configuration.target_environment;
+          fs.writeFileSync('results/formal-legacy-env.json', `${JSON.stringify(data, null, 2)}\n`);
+          NODE
+          if node src/validate-formal-hardening.js results/formal-legacy-env.json; then
+            echo "Legacy formal evidence without target environment was incorrectly accepted."
+            exit 1
+          fi
+      - name: Verify forged production observation is rejected for public-test targets
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data = JSON.parse(fs.readFileSync('results/formal-ci.json', 'utf8'));
+          data.evidence_level = 'production_observation';
+          data.capabilities.production_observation = true;
+          fs.writeFileSync('results/formal-forged-production.json', `${JSON.stringify(data, null, 2)}\n`);
+          NODE
+          if node src/validate-formal-hardening.js results/formal-forged-production.json; then
+            echo "Forged production observation was incorrectly accepted."
+            exit 1
+          fi
       - name: Verify full Go is blocked without staging capability
         run: |
           node --input-type=module <<'NODE'
@@ -85,7 +140,7 @@ jobs:
           source.monitoring = { ready: true, plan: 'negative gate fixture', owner: 'website-qa-checklist', evidence_ids: [evidenceId] };
           fs.writeFileSync('results/formal-unsafe-go.json', `${JSON.stringify(source, null, 2)}\n`);
           NODE
-          if node src/validate-formal.js results/formal-unsafe-go.json; then
+          if node src/validate-formal.js results/formal-unsafe-go.json && node src/validate-formal-hardening.js results/formal-unsafe-go.json; then
             echo "Unsafe Go was incorrectly accepted."
             exit 1
           fi
