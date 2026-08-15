@@ -42,10 +42,18 @@ test("production requests and policies use unique queue paths instead of shared 
   assert.doesNotMatch(finalize, /paths:[\s\S]{0,100}policy\/current\.json/);
 });
 
+test("write workflows require exactly one queue file and no bundled code changes", () => {
+  for (const file of [".github/workflows/run-checklist.yml", ".github/workflows/finalize-checklist.yml"]) {
+    const source = read(file);
+    assert.match(source, /TOTAL_FILES=.*git show/);
+    assert.match(source, /TOTAL_FILES" -ne 1/);
+  }
+});
+
 test("production evidence commits immutable JSON only and uploads browser artifacts", () => {
   const run = read(".github/workflows/run-checklist.yml");
   assert.match(run, /upload-artifact@[a-f0-9]{40}/i);
-  assert.match(run, /retention-days:\s+(?:7|14|30)/);
+  assert.match(run, /retention-days:\s+7/);
   assert.doesNotMatch(run, /git add[^\n]*artifacts\/runs/);
   assert.match(run, /git add[^\n]*results\/runs/);
   assert.doesNotMatch(run, /git add[^\n]*results\/latest\.json/);
@@ -59,11 +67,19 @@ test("write workflows rebase before push to survive concurrent independent runs"
   }
 });
 
-test("browser safety blocks service workers and websocket egress", () => {
-  const source = read("src/browser.js");
-  assert.match(source, /serviceWorkers\s*:\s*["']block["']/);
-  assert.match(source, /routeWebSocket\(/);
-  assert.doesNotMatch(source, /const allowedHosts = new Set\(\)/);
+test("browser safety blocks bypass protocols and pins HTTP(S) through the local public proxy", () => {
+  const browser = read("src/browser.js");
+  const proxy = read("src/public-proxy.js");
+  const network = read("src/net.js");
+  assert.match(browser, /serviceWorkers\s*:\s*["']block["']/);
+  assert.match(browser, /routeWebSocket\(/);
+  assert.match(browser, /startPublicNetworkProxy\(/);
+  assert.match(browser, /force-webrtc-ip-handling-policy=disable_non_proxied_udp/);
+  assert.match(browser, /--disable-quic/);
+  assert.doesNotMatch(browser, /const allowedHosts = new Set\(\)/);
+  assert.match(proxy, /resolvePublicHost\(/);
+  assert.match(proxy, /net\.connect\(\{ host: address/);
+  assert.match(network, /requester\(current, addresses/);
 });
 
 test("runner fails closed on invalid scan levels rather than silently downgrading", () => {
