@@ -21,7 +21,9 @@ const BROWSER_CONFIG = {
   reducedMotion: "reduce",
   waitUntil: "domcontentloaded",
   navigationTimeoutMs: 25_000,
-  loadTimeoutMs: 7_000
+  bodyVisibleTimeoutMs: 8_000,
+  domQuietWindowMs: 450,
+  domQuietMaxWaitMs: 6_000
 };
 
 function compactAxeViolations(violations) {
@@ -64,6 +66,60 @@ async function installPublicRequestGuard(context) {
   });
 }
 
+async function waitForMeaningfulReadiness(page) {
+  const started = Date.now();
+  await page.locator("body").waitFor({
+    state: "visible",
+    timeout: BROWSER_CONFIG.bodyVisibleTimeoutMs
+  });
+
+  const quiescence = await page.evaluate(({ quietWindowMs, maxWaitMs }) => new Promise((resolve) => {
+    let finished = false;
+    let quietTimer;
+    let maxTimer;
+    const startedAt = performance.now();
+
+    const finish = (reason) => {
+      if (finished) return;
+      finished = true;
+      observer.disconnect();
+      clearTimeout(quietTimer);
+      clearTimeout(maxTimer);
+      resolve({ reason, elapsed_ms: Math.round(performance.now() - startedAt) });
+    };
+
+    const scheduleQuiet = () => {
+      clearTimeout(quietTimer);
+      quietTimer = setTimeout(() => finish("dom_quiet"), quietWindowMs);
+    };
+
+    const observer = new MutationObserver(scheduleQuiet);
+    observer.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true
+    });
+    scheduleQuiet();
+    maxTimer = setTimeout(() => finish("max_wait_reached"), maxWaitMs);
+  }), {
+    quietWindowMs: BROWSER_CONFIG.domQuietWindowMs,
+    maxWaitMs: BROWSER_CONFIG.domQuietMaxWaitMs
+  });
+
+  return {
+    body_visible: true,
+    strategy: "body-visible + mutation-quiescence",
+    quiescence_reason: quiescence.reason,
+    quiescence_elapsed_ms: quiescence.elapsed_ms,
+    total_elapsed_ms: Date.now() - started
+  };
+}
+
+function uniqueStrings(values, max = 80) {
+  return [...new Set(values.filter(Boolean))].slice(0, max);
+}
+
 async function inspectViewport(browser, url, name, artifactRoot) {
   const viewport = VIEWPORTS[name];
   const context = await browser.newContext({
@@ -85,6 +141,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
   const traceRelative = path.join(baseDir, "trace.zip");
   const screenshotRelative = path.join(baseDir, "page.png");
   const axeRelative = path.join(baseDir, "axe.json");
+  const domRelative = path.join(baseDir, "dom-inventory.json");
 
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text().slice(0, 500));
@@ -103,28 +160,64 @@ async function inspectViewport(browser, url, name, artifactRoot) {
   let mainResponse;
   let axeFull;
   let dom;
+  let readiness;
   try {
     mainResponse = await page.goto(url, {
       waitUntil: BROWSER_CONFIG.waitUntil,
       timeout: BROWSER_CONFIG.navigationTimeoutMs
     });
-    await page.waitForLoadState("load", { timeout: BROWSER_CONFIG.loadTimeoutMs }).catch(() => {});
-
-    await page.addScriptTag({ content: axeSource });
-    axeFull = await page.evaluate(async () => globalThis.axe.run(document));
+    readiness = await waitForMeaningfulReadiness(page);
 
     dom = await page.evaluate(() => {
       const navigation = performance.getEntriesByType("navigation")[0];
       const html = document.documentElement;
+      const anchors = [...document.querySelectorAll("a[href]")];
+      const images = [...document.querySelectorAll("img")];
+      const controls = [...document.querySelectorAll("button,input,select,textarea")];
+      const baseHost = location.hostname;
+      const internalLinks = anchors.map((node) => {
+        try {
+          const parsed = new URL(node.href, location.href);
+          parsed.hash = "";
+          return parsed.hostname === baseHost && /^https?:$/.test(parsed.protocol) ? parsed.href : null;
+        } catch {
+          return null;
+        }
+      }).filter(Boolean);
+      const inventory = {
+        links: anchors.slice(0, 30).map((node) => ({
+          text: (node.innerText || node.textContent || "").trim().replace(/\s+/g, " ").slice(0, 160),
+          href: node.href || null,
+          aria_label: node.getAttribute("aria-label") || null
+        })),
+        buttons: [...document.querySelectorAll("button")].slice(0, 30).map((node) => ({
+          text: (node.innerText || node.textContent || "").trim().replace(/\s+/g, " ").slice(0, 160),
+          aria_label: node.getAttribute("aria-label") || null,
+          type: node.getAttribute("type") || null
+        })),
+        form_controls: controls.slice(0, 40).map((node) => ({
+          tag: node.tagName.toLowerCase(),
+          type: node.getAttribute("type") || null,
+          name: node.getAttribute("name") || null,
+          aria_label: node.getAttribute("aria-label") || null,
+          placeholder: node.getAttribute("placeholder") || null
+        }))
+      };
       return {
+        document_ready_state: document.readyState,
         title: document.title || null,
+        description: document.querySelector('meta[name="description"]')?.getAttribute("content") || null,
         lang: html.getAttribute("lang") || null,
         viewport_meta: document.querySelector('meta[name="viewport"]')?.getAttribute("content") || null,
         canonical: document.querySelector('link[rel~="canonical"]')?.href || null,
         robots_meta: document.querySelector('meta[name="robots"]')?.getAttribute("content") || null,
         h1_count: document.querySelectorAll("h1").length,
         form_count: document.querySelectorAll("form").length,
+        image_count: images.length,
+        missing_alt_attribute_count: images.filter((node) => !node.hasAttribute("alt")).length,
         interactive_count: document.querySelectorAll("a,button,input,select,textarea,[tabindex]").length,
+        internal_links: [...new Set(internalLinks)].slice(0, 80),
+        inventory,
         navigation_timing: navigation ? {
           ttfb_ms: Math.round(navigation.responseStart - navigation.requestStart),
           dom_content_loaded_ms: Math.round(navigation.domContentLoadedEventEnd - navigation.startTime),
@@ -135,18 +228,24 @@ async function inspectViewport(browser, url, name, artifactRoot) {
       };
     });
 
+    await page.addScriptTag({ content: axeSource });
+    axeFull = await page.evaluate(async () => globalThis.axe.run(document));
+
     await fs.mkdir(path.join(artifactRoot, baseDir), { recursive: true });
     await page.screenshot({ path: path.join(artifactRoot, screenshotRelative), fullPage: true });
     await writeJsonArtifact(artifactRoot, axeRelative, axeFull);
+    await writeJsonArtifact(artifactRoot, domRelative, { readiness, dom });
 
     artifactEntries.push(await describeArtifact(artifactRoot, screenshotRelative, "screenshot", `${name} full-page screenshot`));
     artifactEntries.push(await describeArtifact(artifactRoot, axeRelative, "report", `${name} volledige axe JSON`));
+    artifactEntries.push(await describeArtifact(artifactRoot, domRelative, "report", `${name} DOM/readiness inventaris`));
 
     return {
       viewport: name,
       viewport_size: viewport,
       status_code: mainResponse?.status() || null,
       final_url: page.url(),
+      readiness,
       dom,
       axe: {
         violation_count: axeFull.violations.length,
@@ -159,7 +258,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
       console_errors: consoleErrors.slice(0, 20),
       page_errors: pageErrors.slice(0, 20),
       request_failures: requestFailures.slice(0, 20),
-      mixed_content_requests: [...new Set(mixedContentRequests)].slice(0, 20),
+      mixed_content_requests: uniqueStrings(mixedContentRequests, 20),
       artifact_entries: artifactEntries
     };
   } finally {
@@ -199,7 +298,7 @@ export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoo
       browser: "chromium",
       browser_configuration: BROWSER_CONFIG,
       viewports: VIEWPORTS,
-      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
+      execution_note: "GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.",
       runs
     };
   } finally {
