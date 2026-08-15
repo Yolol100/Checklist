@@ -27,6 +27,8 @@ jobs:
       - name: Install Chromium
         run: node node_modules/playwright/cli.js install --with-deps chromium
       - name: Smoke test raw evidence runner
+        env:
+          CHECKLIST_PERSIST_BROWSER_ARTIFACTS: "0"
         run: npm run scan
       - name: Validate raw evidence contract
         run: npm run validate-result
@@ -39,37 +41,51 @@ jobs:
           if (result.request.target_environment !== 'public_test') throw new Error('CI fixture must remain public_test');
           if (http?.evidence_level === 'production_observation') throw new Error('public_test target was incorrectly labeled production_observation');
           NODE
-      - name: Verify rendered DOM authority
+      - name: Verify rendered DOM authority and bounded probes
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const result = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
           const readiness = result.observations.find((item) => item.id === 'RUNTIME-UI-READINESS');
           const links = result.observations.find((item) => item.id === 'LINK-001');
+          const mutation = result.observations.find((item) => item.id === 'RUNTIME-MUTATION-GUARD');
           if (readiness?.outcome !== 'observed_ok') throw new Error('UI-readiness fixture is niet observed_ok');
           if (links?.data?.basis !== 'rendered_dom') throw new Error(`LINK-001 moet rendered_dom gebruiken, kreeg ${links?.data?.basis}`);
           if (!links?.evidence_ids?.includes('EV-BROWSER-DESKTOP')) throw new Error('LINK-001 mist rendered browser-evidence');
           if (links?.data?.concurrency_limit !== 6) throw new Error('Linkprobe concurrency guard ontbreekt');
+          if (!mutation || JSON.stringify(mutation.data?.allowed_methods) !== JSON.stringify(['GET','HEAD'])) throw new Error('Browser mutation guard ontbreekt');
           NODE
+      - name: Verify public-safe browser evidence persistence
+        run: |
+          test -f results/runs/ci-public-test-v0.6.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const result = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
+          const persistence = result.observations.find((item) => item.id === 'RUNTIME-BROWSER-ARTIFACT-PERSISTENCE');
+          if (persistence?.outcome !== 'not_executed') throw new Error(`Expected not_executed artifact persistence, got ${persistence?.outcome}`);
+          if (result.evidence_registry.some((item) => item.id.startsWith('EV-FILE-'))) throw new Error('Public-safe run exposed EV-FILE evidence');
+          for (const id of ['EV-BROWSER-DESKTOP','EV-AXE-DESKTOP','EV-BROWSER-MOBILE','EV-AXE-MOBILE']) {
+            const evidence = result.evidence_registry.find((item) => item.id === id);
+            if (!evidence || !/^[a-f0-9]{64}$/i.test(evidence.sha256 || '')) throw new Error(`${id} missing hash-bound evidence`);
+          }
+          for (const run of result.browser_evidence?.runs || []) {
+            if (run.browser_error) continue;
+            if (run.artifacts_persisted !== false) throw new Error(`${run.viewport} unexpectedly persisted browser artifacts`);
+            if ((run.artifact_entries || []).length !== 0) throw new Error(`${run.viewport} exposed artifact entries`);
+          }
+          NODE
+          if find artifacts/runs/ci-public-test-v0.6 -type f -print -quit 2>/dev/null | grep -q .; then
+            echo "Public-safe CI persisted sensitive browser artifact files."
+            exit 1
+          fi
       - name: Verify material fingerprint repeatability
         run: |
           FIRST="$(node -p "JSON.parse(require('fs').readFileSync('results/latest.json','utf8')).artifact_fingerprint_sha256")"
-          npm run scan
+          CHECKLIST_PERSIST_BROWSER_ARTIFACTS=0 npm run scan
           npm run validate-result
           SECOND="$(node -p "JSON.parse(require('fs').readFileSync('results/latest.json','utf8')).artifact_fingerprint_sha256")"
           test -n "$FIRST"
           test "$FIRST" = "$SECOND"
-      - name: Verify run history and reproducibility artifacts
-        run: |
-          test -f results/runs/ci-public-test-v0.6.json
-          test -f artifacts/runs/ci-public-test-v0.6/browser/desktop/page.png
-          test -f artifacts/runs/ci-public-test-v0.6/browser/desktop/axe.json
-          test -f artifacts/runs/ci-public-test-v0.6/browser/desktop/dom-inventory.json
-          test -f artifacts/runs/ci-public-test-v0.6/browser/desktop/trace.zip
-          test -f artifacts/runs/ci-public-test-v0.6/browser/mobile/page.png
-          test -f artifacts/runs/ci-public-test-v0.6/browser/mobile/axe.json
-          test -f artifacts/runs/ci-public-test-v0.6/browser/mobile/dom-inventory.json
-          test -f artifacts/runs/ci-public-test-v0.6/browser/mobile/trace.zip
       - name: Build formal evidence manifest from current policy fixture
         run: node src/finalize.js test/fixtures/policy.json results/formal-ci.json
       - name: Validate formal Evidence Manifest 3.0 semantics
@@ -83,8 +99,10 @@ jobs:
           const raw = JSON.parse(fs.readFileSync('results/latest.json', 'utf8'));
           raw.request.request_id = 'no-browser-capability';
           raw.evidence_registry = raw.evidence_registry.filter((item) => !/^EV-(?:BROWSER|AXE|FILE-BROWSER)-/.test(item.id));
+          raw.observations = raw.observations.filter((item) => !['RUNTIME-BROWSER','RUNTIME-UI-READINESS','RUNTIME-MUTATION-GUARD','RUNTIME-BROWSER-ARTIFACT-PERSISTENCE'].includes(item.id));
           raw.runtime_observation.browser_harness = false;
           raw.runtime_observation.browser_evidence = null;
+          raw.browser_evidence = { runs: [] };
           raw.tool_versions = { runner_test_fixture: 'no-browser' };
           fs.writeFileSync('results/runs/no-browser-capability.json', `${JSON.stringify(raw, null, 2)}\n`);
           const policy = JSON.parse(fs.readFileSync('test/fixtures/policy.json', 'utf8'));
