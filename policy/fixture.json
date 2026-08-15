@@ -1,7 +1,7 @@
 {
   "schema_version": "policy-evaluation-v1",
-  "evaluation_id": "QA-FIXTURE-v0.5",
-  "request_id": "fixture-v0.5-source-bound",
+  "evaluation_id": "QA-FIXTURE-v0.6",
+  "request_id": "final-e2e-v0.5-20260815-1755z",
   "source_context": {
     "project_id": "project-checklist",
     "source_set_version": "2026-08-14.1-reconnaissance-before-action",
@@ -18,21 +18,23 @@
     "app_connectors": true
   },
   "scope": {
-    "label": "CI fixture: public read-only standard audit",
+    "label": "CI fixture: hardened public-test read-only standard audit",
     "included": [
       "public HTTP response",
       "rendered Chromium desktop state",
       "mobile viewport emulation",
-      "automated axe observation"
+      "automated axe observation",
+      "target-environment claim gate"
     ],
     "excluded": [
       "authenticated flows",
       "form submission",
       "payments",
+      "representative staging",
       "real device and assistive technology"
     ]
   },
-  "runtime_selection_basis": "Public read-only audit fixture: HTTP + Chromium desktop + mobile emulation are required for this test contract.",
+  "runtime_selection_basis": "Public-test read-only audit fixture: HTTP + Chromium desktop + mobile emulation are required; staging is not claimed.",
   "required_runtime_ids": [
     "RT-PUBLIC-HTTP",
     "RT-BROWSER-DESKTOP",
@@ -43,7 +45,7 @@
   "false_positives": [],
   "rounds": [
     {
-      "request_id": "fixture-v0.5-source-bound",
+      "request_id": "final-e2e-v0.5-20260815-1755z",
       "status": "passed"
     }
   ],
