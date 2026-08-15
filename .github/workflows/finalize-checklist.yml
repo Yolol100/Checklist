@@ -5,30 +5,53 @@ on:
     branches:
       - main
     paths:
-      - policy/current.json
+      - "policy/queue/*.json"
 
 permissions:
   contents: write
 
-concurrency:
-  group: checklist-finalize
-  cancel-in-progress: true
-
 jobs:
   finalize:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
+
+      - name: Identify immutable policy evaluation
+        id: policy
+        shell: bash
+        run: |
+          mapfile -t FILES < <(git show --pretty='' --name-only "$GITHUB_SHA" | grep -E '^policy/queue/[A-Za-z0-9._-]+\.json$' || true)
+          if [ "${#FILES[@]}" -ne 1 ]; then
+            echo "Expected exactly one queue policy in triggering commit; found ${#FILES[@]}." >&2
+            exit 1
+          fi
+          POLICY_PATH="${FILES[0]}"
+          EVALUATION_ID="$(node -e 'const fs=require("fs"); const p=process.argv[1]; const r=JSON.parse(fs.readFileSync(p,"utf8")); process.stdout.write(String(r.evaluation_id||""));' "$POLICY_PATH")"
+          if ! [[ "$EVALUATION_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$ ]]; then
+            echo "Invalid evaluation_id." >&2
+            exit 1
+          fi
+          if [ "$(basename "$POLICY_PATH" .json)" != "$EVALUATION_ID" ]; then
+            echo "Queue filename must equal evaluation_id." >&2
+            exit 1
+          fi
+          if [ -e "results/formal/$EVALUATION_ID.json" ]; then
+            echo "Immutable formal result already exists for $EVALUATION_ID." >&2
+            exit 1
+          fi
+          echo "policy_path=$POLICY_PATH" >> "$GITHUB_OUTPUT"
+          echo "evaluation_id=$EVALUATION_ID" >> "$GITHUB_OUTPUT"
+          echo "formal_path=results/formal/$EVALUATION_ID.json" >> "$GITHUB_OUTPUT"
 
       - name: Install locked dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -37,19 +60,25 @@ jobs:
         run: npm run check
 
       - name: Build formal evidence manifest
-        run: npm run finalize
+        run: node src/finalize.js "${{ steps.policy.outputs.policy_path }}" "${{ steps.policy.outputs.formal_path }}"
 
       - name: Validate formal Evidence Manifest 3.0 semantics
-        run: npm run validate-formal
+        run: node src/validate-formal.js "${{ steps.policy.outputs.formal_path }}"
 
-      - name: Save formal manifest
+      - name: Commit immutable formal manifest
+        shell: bash
         run: |
+          FORMAL_PATH="${{ steps.policy.outputs.formal_path }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add results/formal-latest.json
-          if git diff --cached --quiet; then
-            echo "No formal evidence changes to commit."
-          else
-            git commit -m "Update checklist formal evidence"
-            git push origin HEAD:main
-          fi
+          git add "$FORMAL_PATH"
+          git commit -m "Add checklist formal evidence ${{ steps.policy.outputs.evaluation_id }}"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep $((attempt * 2))
+          done
+          echo "Could not publish immutable formal result after bounded retries." >&2
+          exit 1
