@@ -1,0 +1,383 @@
+{
+  "schema_version": "3.0",
+  "run_id": "QA-INTEGRATION-v0.5-main",
+  "generated_at": "2026-08-15T17:45:54.448Z",
+  "task_type": "audit",
+  "artifact": {
+    "name": "https://example.com/",
+    "sha256": "202f96e48874c3d25f994e42e67aa590bb20b8bc495ba225b1cc82a9f14e015a"
+  },
+  "scope": {
+    "label": "Integratievalidatie Checklist runner v0.5 op main",
+    "included": [
+      "source-bound raw requestacceptatie",
+      "publieke HTTP evidencecollectie",
+      "Chromium desktop rendered-UI readiness en artifacts",
+      "Chromium mobiele viewportemulatie en artifacts",
+      "raw-evidence-v1 validatie",
+      "deterministische policy-evaluation naar Evidence Manifest 3.0 en Runtime Matrix 2.0"
+    ],
+    "excluded": [
+      "inhoudelijk releaseoordeel over example.com",
+      "security-, SEO- of toegankelijkheidsacceptatie van example.com",
+      "authenticated flows",
+      "formulierinzendingen en betalingen",
+      "echt apparaat, echte Safari/iOS en assistive technology"
+    ]
+  },
+  "evidence_level": "production_observation",
+  "capabilities": {
+    "public_browser": true,
+    "authenticated_browser": false,
+    "browser_emulation": true,
+    "real_device": false,
+    "assistive_technology": false,
+    "staging_access": false,
+    "production_observation": true,
+    "limitations": [
+      "Publieke read-only observatie; geen ingelogde flow of productie-mutatie.",
+      "Geen formele WCAG-conformiteitsclaim.",
+      "Axe automatiseert slechts een deel van toegankelijkheid; keyboard, zoom en screenreader zijn aparte tests.",
+      "Mobiele Chromium-emulatie is geen echt-device- of echte Safari/iOS-evidence.",
+      "Geen formulierinzendingen, betalingen, orders of andere writes.",
+      "Synthetische browser-timing vervangt geen echte Core Web Vitals-velddata.",
+      "De runner kent geen QA-prioriteit of releasebesluit toe; de Website QA Skill en actieve Drive-bronnen doen dat."
+    ],
+    "experience": "chat",
+    "host": "web",
+    "cloud_browser": false,
+    "local_files": false,
+    "local_repository": false,
+    "terminal_commands": false,
+    "browser_harness": true,
+    "desktop_app_control": false,
+    "app_connectors": true
+  },
+  "tool_versions": {
+    "runner": "0.5.0",
+    "playwright": "1.62.0",
+    "axe_core": "4.12.1"
+  },
+  "scan_configuration": {
+    "config_hash": "22a136e0793fb8336ee47a5e005d3f970e8c1f9cc29871fbfb5b6f8b4726f8c7",
+    "level": "standard",
+    "source_set_version": "2026-08-14.1-reconnaissance-before-action",
+    "manifest_sha256": "4f2f4b5be10faa61b0ad9b23b7ada76568117ae4c4e4c29efe8510ca58888b46",
+    "evidence_schema_sha256": "a43fe9183e2141d2d9efc3b0192e399d7fff7433374542699ea59660c4af59e1",
+    "runtime_schema_sha256": "9c6c6660e02193d126efbeb75b4943c5d7a82c1401852e69f6b72b9ee4576eb2"
+  },
+  "environment": {
+    "runner_host": "github-actions",
+    "target": "https://example.com/",
+    "source_project": "project-checklist"
+  },
+  "baseline_contract_hash": "0fa5af2c0021dc37629d8c335d77d08671351416bb28724d5cd652212327a35e",
+  "runtime_matrix": {
+    "schema_version": "2.0",
+    "items": [
+      {
+        "id": "RT-PUBLIC-HTTP",
+        "category": "platform",
+        "component": "publieke HTTP-observatie",
+        "target": "https://example.com/",
+        "version_or_configuration": null,
+        "selection_basis": "Voor deze integratievalidatie moeten de publieke HTTP-laag en beide geïmplementeerde Chromium-runtimes aantoonbaar zijn uitgevoerd; hogere handmatige lagen vallen expliciet buiten deze testscope.",
+        "execution_mode": "synthetic",
+        "required": true,
+        "status": "passed",
+        "evidence_ids": [
+          "fixture-v0.5-source-bound--EV-HTTP-MAIN"
+        ],
+        "limitation": "Publieke read-only observatie; geen login of targetmutatie.",
+        "not_applicable_reason": null,
+        "surface": "chat-web",
+        "capability": "public-http",
+        "invocation_status": "called",
+        "recommended_surface": null
+      },
+      {
+        "id": "RT-BROWSER-DESKTOP",
+        "category": "browser",
+        "component": "Chromium desktop browserharness",
+        "target": "https://example.com/",
+        "version_or_configuration": "Playwright 1.62.0; axe 4.12.1",
+        "selection_basis": "Voor deze integratievalidatie moeten de publieke HTTP-laag en beide geïmplementeerde Chromium-runtimes aantoonbaar zijn uitgevoerd; hogere handmatige lagen vallen expliciet buiten deze testscope.",
+        "execution_mode": "synthetic",
+        "required": true,
+        "status": "passed",
+        "evidence_ids": [
+          "fixture-v0.5-source-bound--EV-BROWSER-DESKTOP"
+        ],
+        "limitation": "Synthetische GitHub Actions Chromium-run; geen echte gebruikersbrowser.",
+        "not_applicable_reason": null,
+        "surface": "chat-web",
+        "capability": "github-actions-remote-browser-harness",
+        "invocation_status": "called",
+        "recommended_surface": null
+      },
+      {
+        "id": "RT-BROWSER-MOBILE",
+        "category": "device",
+        "component": "Chromium mobiele viewportemulatie",
+        "target": "https://example.com/",
+        "version_or_configuration": "Playwright 1.62.0; axe 4.12.1",
+        "selection_basis": "Voor deze integratievalidatie moeten de publieke HTTP-laag en beide geïmplementeerde Chromium-runtimes aantoonbaar zijn uitgevoerd; hogere handmatige lagen vallen expliciet buiten deze testscope.",
+        "execution_mode": "emulated",
+        "required": true,
+        "status": "passed",
+        "evidence_ids": [
+          "fixture-v0.5-source-bound--EV-BROWSER-MOBILE"
+        ],
+        "limitation": "Viewportemulatie is geen echt mobiel apparaat of echte Safari/iOS.",
+        "not_applicable_reason": null,
+        "surface": "chat-web",
+        "capability": "github-actions-remote-browser-harness",
+        "invocation_status": "called",
+        "recommended_surface": null
+      },
+      {
+        "id": "RT-KEYBOARD-ZOOM-SCREENREADER",
+        "category": "assistive_technology",
+        "component": "keyboard, zoom en screenreader",
+        "target": "https://example.com/",
+        "version_or_configuration": null,
+        "selection_basis": "Voor deze integratievalidatie moeten de publieke HTTP-laag en beide geïmplementeerde Chromium-runtimes aantoonbaar zijn uitgevoerd; hogere handmatige lagen vallen expliciet buiten deze testscope.",
+        "execution_mode": "not_executed",
+        "required": false,
+        "status": "not_applicable",
+        "evidence_ids": [],
+        "limitation": "Vereist aparte echte browser/input/AT-evidence wanneer de QA-bronnen dit voor de scope verplicht stellen.",
+        "not_applicable_reason": "Niet verplicht binnen de door Website QA vastgelegde scope.",
+        "surface": "chat-web",
+        "capability": null,
+        "invocation_status": "not_needed",
+        "recommended_surface": null
+      },
+      {
+        "id": "RT-REAL-IOS",
+        "category": "device",
+        "component": "echt mobiel apparaat / echte Safari-iOS",
+        "target": "https://example.com/",
+        "version_or_configuration": null,
+        "selection_basis": "Voor deze integratievalidatie moeten de publieke HTTP-laag en beide geïmplementeerde Chromium-runtimes aantoonbaar zijn uitgevoerd; hogere handmatige lagen vallen expliciet buiten deze testscope.",
+        "execution_mode": "not_executed",
+        "required": false,
+        "status": "not_applicable",
+        "evidence_ids": [],
+        "limitation": "Niet uitvoerbaar in deze remote read-only GitHub Actions runner.",
+        "not_applicable_reason": "Niet verplicht binnen de door Website QA vastgelegde scope.",
+        "surface": "chat-web",
+        "capability": null,
+        "invocation_status": "not_needed",
+        "recommended_surface": null
+      }
+    ]
+  },
+  "evidence_registry": [
+    {
+      "id": "fixture-v0.5-source-bound--EV-HTTP-MAIN",
+      "type": "response",
+      "source": "runtime:main-http-response",
+      "created_at": "2026-08-15T17:45:06.550Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/",
+      "sha256": null,
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-LINK-SAMPLE",
+      "type": "report",
+      "source": "runtime:internal-link-sample",
+      "created_at": "2026-08-15T17:45:06.550Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-ROBOTS",
+      "type": "response",
+      "source": "runtime:robots.txt",
+      "created_at": "2026-08-15T17:45:06.550Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/robots.txt",
+      "sha256": "e5dca624fdc371659aeaecdb0ddc54a6c3ad28057d541b145d2a8802a8789bac",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-BROWSER-DESKTOP",
+      "type": "report",
+      "source": "runtime:chromium-desktop",
+      "created_at": "2026-08-15T17:45:06.550Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/",
+      "sha256": "ccdf9aae16c3b7dd935acb026935c2f7ea30a5dae4485370a81d7de621572078",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-AXE-DESKTOP",
+      "type": "report",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/desktop/axe.json",
+      "created_at": "2026-08-15T17:45:05.584Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/ (desktop)",
+      "sha256": "6ad0c8a07e420f8c11eed430f7dff001ebbdca3b2f2ee2bb2d6c96341d5d6dd3",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-FILE-BROWSER-DESKTOP-PAGE-PNG",
+      "type": "screenshot",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/desktop/page.png",
+      "created_at": "2026-08-15T17:45:05.582Z",
+      "environment": "github-actions",
+      "scope": "desktop full-page screenshot",
+      "sha256": "b0250fbbe6cb5b9233ce8c3d2002e409d42cd0ab58ae453068063ad8b30156c1",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-FILE-BROWSER-DESKTOP-AXE-JSON",
+      "type": "report",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/desktop/axe.json",
+      "created_at": "2026-08-15T17:45:05.584Z",
+      "environment": "github-actions",
+      "scope": "desktop volledige axe JSON",
+      "sha256": "6ad0c8a07e420f8c11eed430f7dff001ebbdca3b2f2ee2bb2d6c96341d5d6dd3",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-FILE-BROWSER-DESKTOP-DOM-INVENTORY-JSON",
+      "type": "report",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/desktop/dom-inventory.json",
+      "created_at": "2026-08-15T17:45:05.585Z",
+      "environment": "github-actions",
+      "scope": "desktop DOM/readiness inventaris",
+      "sha256": "36c1e76daee5075d7a63daf6a8bb2b85a3088fff200e195f9eef9785bbe652b8",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-FILE-BROWSER-DESKTOP-TRACE-ZIP",
+      "type": "trace",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/desktop/trace.zip",
+      "created_at": "2026-08-15T17:45:05.629Z",
+      "environment": "github-actions",
+      "scope": "desktop Playwright trace",
+      "sha256": "51e42e2da0fc3130b6fd62e6bfa880edffd7f54ee88160823d4d452cafa78d6e",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-BROWSER-MOBILE",
+      "type": "report",
+      "source": "runtime:chromium-mobile",
+      "created_at": "2026-08-15T17:45:06.550Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/",
+      "sha256": "0cd9b6c307fc38c85ab22d8fa1a09ab777ea0571924ed16bf2182be99470e565",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-AXE-MOBILE",
+      "type": "report",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/mobile/axe.json",
+      "created_at": "2026-08-15T17:45:06.464Z",
+      "environment": "github-actions",
+      "scope": "https://example.com/ (mobile)",
+      "sha256": "ae30df70cd810ed0f0ba5b3002805fdb488c5104bba946f099a4c27c3e0ec4bd",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-FILE-BROWSER-MOBILE-PAGE-PNG",
+      "type": "screenshot",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/mobile/page.png",
+      "created_at": "2026-08-15T17:45:06.463Z",
+      "environment": "github-actions",
+      "scope": "mobile full-page screenshot",
+      "sha256": "79aced1cf245c456caa0dcfe73cf43f71d5790fb09693f626b827f35ea201770",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-FILE-BROWSER-MOBILE-AXE-JSON",
+      "type": "report",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/mobile/axe.json",
+      "created_at": "2026-08-15T17:45:06.464Z",
+      "environment": "github-actions",
+      "scope": "mobile volledige axe JSON",
+      "sha256": "ae30df70cd810ed0f0ba5b3002805fdb488c5104bba946f099a4c27c3e0ec4bd",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-FILE-BROWSER-MOBILE-DOM-INVENTORY-JSON",
+      "type": "report",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/mobile/dom-inventory.json",
+      "created_at": "2026-08-15T17:45:06.465Z",
+      "environment": "github-actions",
+      "scope": "mobile DOM/readiness inventaris",
+      "sha256": "285c3e5342904a4bcecf22a9b70005819873ab036cf850656cafb0c792008589",
+      "redaction": null
+    },
+    {
+      "id": "fixture-v0.5-source-bound--EV-FILE-BROWSER-MOBILE-TRACE-ZIP",
+      "type": "trace",
+      "source": "artifacts/runs/fixture-v0.5-source-bound/browser/mobile/trace.zip",
+      "created_at": "2026-08-15T17:45:06.502Z",
+      "environment": "github-actions",
+      "scope": "mobile Playwright trace",
+      "sha256": "e1ab7513c719c1f5719726e2c6bd4751e48aac2bfe836803858fe0ab63add04a",
+      "redaction": null
+    },
+    {
+      "id": "EV-POLICY-EVALUATION",
+      "type": "report",
+      "source": "policy/current.json",
+      "created_at": "2026-08-15T17:45:54.447Z",
+      "environment": "website-qa-policy",
+      "scope": "Integratievalidatie Checklist runner v0.5 op main",
+      "sha256": "86dad0e23339dd767237a1f8df092338fcae9bcf3341705f4fea22b447a4995c",
+      "redaction": null
+    }
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "status": "passed",
+      "artifact_sha256": "202f96e48874c3d25f994e42e67aa590bb20b8bc495ba225b1cc82a9f14e015a",
+      "contract_hash": "0fa5af2c0021dc37629d8c335d77d08671351416bb28724d5cd652212327a35e",
+      "findings_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "tool_config_hash": "22a136e0793fb8336ee47a5e005d3f970e8c1f9cc29871fbfb5b6f8b4726f8c7",
+      "evidence_ids": [
+        "fixture-v0.5-source-bound--EV-HTTP-MAIN",
+        "fixture-v0.5-source-bound--EV-LINK-SAMPLE",
+        "fixture-v0.5-source-bound--EV-ROBOTS",
+        "fixture-v0.5-source-bound--EV-BROWSER-DESKTOP",
+        "fixture-v0.5-source-bound--EV-AXE-DESKTOP",
+        "fixture-v0.5-source-bound--EV-FILE-BROWSER-DESKTOP-PAGE-PNG",
+        "fixture-v0.5-source-bound--EV-FILE-BROWSER-DESKTOP-AXE-JSON",
+        "fixture-v0.5-source-bound--EV-FILE-BROWSER-DESKTOP-DOM-INVENTORY-JSON",
+        "fixture-v0.5-source-bound--EV-FILE-BROWSER-DESKTOP-TRACE-ZIP",
+        "fixture-v0.5-source-bound--EV-BROWSER-MOBILE",
+        "fixture-v0.5-source-bound--EV-AXE-MOBILE",
+        "fixture-v0.5-source-bound--EV-FILE-BROWSER-MOBILE-PAGE-PNG",
+        "fixture-v0.5-source-bound--EV-FILE-BROWSER-MOBILE-AXE-JSON",
+        "fixture-v0.5-source-bound--EV-FILE-BROWSER-MOBILE-DOM-INVENTORY-JSON",
+        "fixture-v0.5-source-bound--EV-FILE-BROWSER-MOBILE-TRACE-ZIP"
+      ]
+    }
+  ],
+  "findings": [],
+  "false_positives": [],
+  "changes": [],
+  "unexecuted_tests": [],
+  "rollback": {
+    "available": false,
+    "tested": false,
+    "plan": "Niet van toepassing: deze policy valideert uitsluitend een read-only integratierun en wijzigt de geteste website niet.",
+    "owner": "website-qa-checklist",
+    "evidence_ids": []
+  },
+  "monitoring": {
+    "ready": false,
+    "plan": "Geen livegangclaim binnen deze integratiescope; workflow- en CI-status zijn apart gecontroleerd.",
+    "owner": "website-qa-checklist",
+    "evidence_ids": []
+  },
+  "release_decision": "conditional_go"
+}
