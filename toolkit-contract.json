@@ -23,7 +23,7 @@
     {"tool":"axe-core","path":"src/browser.js","contains":"axeSource"},
     {"tool":"bounded-link-scan","path":"src/supplemental.js","contains":"boundedLinkScan"},
     {"tool":"nu-html-checker","path":".github/workflows/run-checklist.yml","contains":"VNU_ASSET_ID"},
-    {"tool":"lighthouse-ci","path":".github/workflows/run-checklist.yml","contains":"@lhci/cli@0.15.1"}
+    {"tool":"lighthouse-ci","path":".github/workflows/run-checklist.yml","contains":"npx --no-install lhci collect"}
   ],
   "boundaries": [
     "Firefox/WebKit are Playwright synthetic evidence, not real device or branded Safari/iOS proof.",
