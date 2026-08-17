@@ -97,10 +97,6 @@ jobs:
           java -jar tools/vnu.jar --exit-zero-always --stdout --format json "$TARGET_URL" > reports/vnu.json
           test -s reports/vnu.json
 
-      - name: Install pinned Lighthouse CI
-        if: steps.request.outputs.level == 'full' || steps.request.outputs.task_type == 'release_verification'
-        run: npm install --global @lhci/cli@0.15.1
-
       - name: Run Lighthouse lab diagnosis
         if: steps.request.outputs.level == 'full' || steps.request.outputs.task_type == 'release_verification'
         env:
@@ -109,7 +105,7 @@ jobs:
           export CHROME_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")"
           # GitHub-hosted Ubuntu 24.04 can block Chromium's process sandbox via AppArmor/user namespaces.
           # Scope the official LHCI no-sandbox workaround to this disposable Lighthouse lab process only.
-          lhci collect --url="$TARGET_URL" --numberOfRuns=1 --settings.chromeFlags="--no-sandbox"
+          npx --no-install lhci collect --url="$TARGET_URL" --numberOfRuns=1 --settings.chromeFlags="--no-sandbox"
 
       - name: Merge supplemental evidence
         run: node src/append-supplemental.js "${{ steps.request.outputs.request_path }}"
