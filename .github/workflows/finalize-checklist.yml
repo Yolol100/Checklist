@@ -3,12 +3,12 @@ name: Finalize Checklist
 on:
   push:
     branches:
-      - main
+      - 'runtime/**'
     paths:
       - "policy/queue/*.json"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   finalize:
@@ -47,7 +47,7 @@ jobs:
             exit 1
           fi
           if [ -e "results/formal/$EVALUATION_ID.json" ]; then
-            echo "Immutable formal result already exists for $EVALUATION_ID." >&2
+            echo "Runtime branch already contains a formal result for $EVALUATION_ID." >&2
             exit 1
           fi
           echo "policy_path=$POLICY_PATH" >> "$GITHUB_OUTPUT"
@@ -69,20 +69,10 @@ jobs:
       - name: Validate formal cross-field hardening
         run: node src/validate-formal-hardening.js "${{ steps.policy.outputs.formal_path }}"
 
-      - name: Commit immutable formal manifest
-        shell: bash
-        run: |
-          FORMAL_PATH="${{ steps.policy.outputs.formal_path }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$FORMAL_PATH"
-          git commit -m "Add checklist formal evidence ${{ steps.policy.outputs.evaluation_id }}"
-          for attempt in 1 2 3; do
-            if git pull --rebase origin main && git push origin HEAD:main; then
-              exit 0
-            fi
-            git rebase --abort 2>/dev/null || true
-            sleep $((attempt * 2))
-          done
-          echo "Could not publish immutable formal result after bounded retries." >&2
-          exit 1
+      - name: Upload immutable formal manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: checklist-formal-${{ steps.policy.outputs.evaluation_id }}
+          path: ${{ steps.policy.outputs.formal_path }}
+          if-no-files-found: error
+          retention-days: 14

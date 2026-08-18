@@ -3,8 +3,11 @@ node_modules/
 .DS_Store
 npm-debug.log*
 artifacts/
+reports/
+tools/
+requests/queue/
+policy/queue/
+results/runs/
+results/formal/
 results/latest.json
 results/formal-latest.json
-results/formal-*.json
-results/runs/ci-*.json
-policy/*-ci.json

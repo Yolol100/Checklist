@@ -3,12 +3,12 @@ name: Run Checklist
 on:
   push:
     branches:
-      - main
+      - 'runtime/**'
     paths:
       - "requests/queue/*.json"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   checklist:
@@ -52,7 +52,7 @@ jobs:
           NODE
           REQUEST_ID="$(node -e 'const fs=require("fs"); const p=process.argv[1]; const r=JSON.parse(fs.readFileSync(p,"utf8")); process.stdout.write(String(r.request_id||""));' "$REQUEST_PATH")"
           if [ -e "results/runs/$REQUEST_ID.json" ]; then
-            echo "Immutable result already exists for $REQUEST_ID." >&2
+            echo "Runtime branch already contains a result for $REQUEST_ID." >&2
             exit 1
           fi
 
@@ -103,8 +103,6 @@ jobs:
           TARGET_URL: ${{ steps.request.outputs.target_url }}
         run: |
           export CHROME_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")"
-          # GitHub-hosted Ubuntu 24.04 can block Chromium's process sandbox via AppArmor/user namespaces.
-          # Scope the official LHCI no-sandbox workaround to this disposable Lighthouse lab process only.
           npx --no-install lhci collect --url="$TARGET_URL" --numberOfRuns=1 --settings.chromeFlags="--no-sandbox"
 
       - name: Merge supplemental evidence
@@ -113,21 +111,10 @@ jobs:
       - name: Validate raw evidence contract
         run: node src/validate-result.js results/latest.json
 
-      - name: Commit immutable raw result
-        shell: bash
-        run: |
-          REQUEST_ID="${{ steps.request.outputs.request_id }}"
-          git restore results/latest.json || true
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "results/runs/$REQUEST_ID.json"
-          git commit -m "Add checklist raw evidence $REQUEST_ID"
-          for attempt in 1 2 3; do
-            if git pull --rebase origin main && git push origin HEAD:main; then
-              exit 0
-            fi
-            git rebase --abort 2>/dev/null || true
-            sleep $((attempt * 2))
-          done
-          echo "Could not publish immutable raw result after bounded retries." >&2
-          exit 1
+      - name: Upload immutable raw result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: checklist-raw-${{ steps.request.outputs.request_id }}
+          path: results/runs/${{ steps.request.outputs.request_id }}.json
+          if-no-files-found: error
+          retention-days: 14

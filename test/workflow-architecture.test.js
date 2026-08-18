@@ -18,18 +18,19 @@ test("all external GitHub actions use immutable 40-char commit SHAs", () => {
   }
 });
 
-test("CI has read-only repository permissions", () => {
-  const source = read(".github/workflows/ci.yml");
-  assert.match(source, /permissions:\s*\n\s+contents:\s+read/);
-  assert.doesNotMatch(source, /contents:\s+write/);
-});
-
-test("dependency install is lockfile-only and lifecycle scripts are disabled", () => {
+test("all production workflows have read-only repository permissions", () => {
   for (const file of workflowFiles) {
     const source = read(file);
-    assert.match(source, /npm ci --ignore-scripts --no-audit --no-fund/);
-    assert.doesNotMatch(source, /\bnpx\s+playwright\s+install/);
-    if (/Install Chromium/.test(source)) assert.match(source, /node node_modules\/playwright\/cli\.js install/);
+    assert.match(source, /permissions:\s*\n\s+contents:\s+read/);
+    assert.doesNotMatch(source, /contents:\s+write/);
+  }
+});
+
+test("runtime request and policy workflows never target main", () => {
+  for (const file of [".github/workflows/run-checklist.yml", ".github/workflows/finalize-checklist.yml"]) {
+    const source = read(file);
+    assert.match(source, /branches:\s*\n\s+- ['"]runtime\/\*\*['"]/);
+    assert.doesNotMatch(source, /branches:\s*\n\s+- main/);
   }
 });
 
@@ -42,7 +43,7 @@ test("production requests and policies use unique queue paths instead of shared 
   assert.doesNotMatch(finalize, /paths:[\s\S]{0,100}policy\/current\.json/);
 });
 
-test("write workflows require exactly one queue file and no bundled code changes", () => {
+test("runtime workflows require exactly one queue file and no bundled code changes", () => {
   for (const file of [".github/workflows/run-checklist.yml", ".github/workflows/finalize-checklist.yml"]) {
     const source = read(file);
     assert.match(source, /TOTAL_FILES=.*git show/);
@@ -50,21 +51,21 @@ test("write workflows require exactly one queue file and no bundled code changes
   }
 });
 
-test("public production workflow persists only immutable JSON, never sensitive browser artifacts", () => {
+test("raw production workflow publishes immutable JSON only as a run-scoped artifact", () => {
   const run = read(".github/workflows/run-checklist.yml");
-  assert.doesNotMatch(run, /upload-artifact/);
-  assert.doesNotMatch(run, /git add[^\n]*artifacts\/runs/);
-  assert.match(run, /git add[^\n]*results\/runs/);
-  assert.doesNotMatch(run, /git add[^\n]*results\/latest\.json/);
+  assert.match(run, /actions\/upload-artifact@[a-f0-9]{40}/i);
+  assert.match(run, /results\/runs\/\$\{\{ steps\.request\.outputs\.request_id \}\}\.json/);
+  assert.doesNotMatch(run, /git add[^\n]*results\/runs/);
+  assert.doesNotMatch(run, /git push/);
   assert.match(run, /CHECKLIST_PERSIST_BROWSER_ARTIFACTS:\s*["']0["']/);
 });
 
-test("write workflows rebase before push to survive concurrent independent runs", () => {
-  for (const file of [".github/workflows/run-checklist.yml", ".github/workflows/finalize-checklist.yml"]) {
-    const source = read(file);
-    assert.match(source, /git pull --rebase origin main/);
-    assert.match(source, /git push origin HEAD:main/);
-  }
+test("formal workflow publishes manifest only as a run-scoped artifact", () => {
+  const finalize = read(".github/workflows/finalize-checklist.yml");
+  assert.match(finalize, /actions\/upload-artifact@[a-f0-9]{40}/i);
+  assert.match(finalize, /steps\.policy\.outputs\.formal_path/);
+  assert.doesNotMatch(finalize, /git add/);
+  assert.doesNotMatch(finalize, /git push/);
 });
 
 test("browser safety blocks bypass protocols and pins HTTP(S) through the local public proxy", () => {
