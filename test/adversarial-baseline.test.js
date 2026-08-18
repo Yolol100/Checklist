@@ -27,9 +27,11 @@ test("GitHub Actions are pinned to immutable full commit SHAs", () => {
   }
 });
 
-test("public production workflow neither commits nor uploads browser artifacts", () => {
+test("public production workflow publishes only redacted raw JSON and never browser artifacts", () => {
   const source = read(".github/workflows/run-checklist.yml");
   assert.doesNotMatch(source, /git add[^\n]*artifacts\/runs/);
-  assert.doesNotMatch(source, /upload-artifact/);
+  assert.match(source, /actions\/upload-artifact@[a-f0-9]{40}/i);
+  assert.match(source, /path:\s+results\/runs\/\$\{\{ steps\.request\.outputs\.request_id \}\}\.json/);
+  assert.doesNotMatch(source, /playwright-report|test-results|artifacts\/runs|screenshots?|traces?|axe[^\n]*\.json/i);
   assert.match(source, /CHECKLIST_PERSIST_BROWSER_ARTIFACTS:\s*["']0["']/);
 });
