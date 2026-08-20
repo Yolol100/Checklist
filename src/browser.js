@@ -30,6 +30,11 @@ const BROWSER_CONFIG = {
   webRtcIpHandlingPolicy: "disable_non_proxied_udp",
   quic: "disabled",
   artifactPersistence: PERSIST_BROWSER_ARTIFACTS ? "explicit-opt-in" : "disabled",
+  screenshotStability: {
+    animations: "disabled",
+    caret: "hide",
+    scale: "css"
+  },
   waitUntil: "domcontentloaded",
   navigationTimeoutMs: 25_000,
   bodyVisibleTimeoutMs: 8_000,
@@ -245,7 +250,7 @@ async function inspectViewport(browser, url, name, artifactRoot) {
 
     if (PERSIST_BROWSER_ARTIFACTS) {
       await fs.mkdir(path.join(artifactRoot, baseDir), { recursive: true });
-      await page.screenshot({ path: path.join(artifactRoot, screenshotRelative), fullPage: true });
+      await page.screenshot({ path: path.join(artifactRoot, screenshotRelative), fullPage: true, ...BROWSER_CONFIG.screenshotStability });
       await writeJsonArtifact(artifactRoot, axeRelative, axeFull);
       await writeJsonArtifact(artifactRoot, domRelative, { readiness, dom, scenarios });
       artifactEntries.push(await describeArtifact(artifactRoot, screenshotRelative, "screenshot", `${name} full-page screenshot`));
@@ -316,7 +321,7 @@ export async function runBrowserEvidence(rawUrl, level = "standard", artifactRoo
       browser: "chromium",
       browser_configuration: BROWSER_CONFIG,
       viewports: VIEWPORTS,
-      execution_note: `GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. De read-only scenario-signalen voegen formulier-, consent-, keyboard-, dialog-, responsive- en commerce-observaties toe zonder formulierinzending, betaling of andere write. HTTP(S)-egress gaat via een lokale DNS-pinning proxy; alleen GET/HEAD zijn toegestaan en Service Workers, WebSocket-egress, non-proxied WebRTC UDP en QUIC zijn geblokkeerd. Volledige screenshots/traces/axe/DOM-artifacts worden ${PERSIST_BROWSER_ARTIFACTS ? "expliciet lokaal gepersisteerd" : "niet gepersisteerd in publieke modus"}. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.`,
+      execution_note: `GitHub Actions voert een synthetische Chromium-browserrun uit tegen de publieke target. DOM-observaties worden pas na zichtbare body + mutation-quiescence verzameld. De read-only scenario-signalen voegen formulier-, consent-, keyboard-, dialog-, responsive- en commerce-observaties toe zonder formulierinzending, betaling of andere write. HTTP(S)-egress gaat via een lokale DNS-pinning proxy; alleen GET/HEAD zijn toegestaan en Service Workers, WebSocket-egress, non-proxied WebRTC UDP en QUIC zijn geblokkeerd. Bij expliciet gepersisteerde screenshots worden animaties uitgeschakeld, de tekstcaret verborgen en CSS-pixel scaling gebruikt om regressieruis te beperken. Volledige screenshots/traces/axe/DOM-artifacts worden ${PERSIST_BROWSER_ARTIFACTS ? "expliciet lokaal gepersisteerd" : "niet gepersisteerd in publieke modus"}. Mobile is emulatie; dit is geen browser_at-bewijs voor echte Safari/iOS of assistive technology.`,
       runs
     };
   } finally {
