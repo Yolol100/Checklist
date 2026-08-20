@@ -17,3 +17,11 @@ test("scenario signals extend rather than replace rich browser evidence", () => 
   assert.match(browser, /describeArtifact\(artifactRoot,\s*axeRelative/);
   assert.match(browser, /describeArtifact\(artifactRoot,\s*domRelative/);
 });
+
+test("persisted browser screenshots use deterministic Playwright settings", () => {
+  assert.match(browser, /screenshotStability/);
+  assert.match(browser, /animations:\s*"disabled"/);
+  assert.match(browser, /caret:\s*"hide"/);
+  assert.match(browser, /scale:\s*"css"/);
+  assert.match(browser, /page\.screenshot\(\{[^}]*\.\.\.BROWSER_CONFIG\.screenshotStability/);
+});
