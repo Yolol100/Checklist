@@ -1,5 +1,9 @@
 # Webactueel Checklist QA Runner
 
+> **Portfoliostatus:** Actief ondersteunend · Webactueel QA-evidencerunner
+
+**Rol in het platform:** [Checklist](https://github.com/Yolol100/Checklist) voert begrensde read-only QA uit voor `website-qa-checklist`. Voor browser-, accessibility-, performance- of visual-regressie-evidence kan de owning workflow [Designchecker](https://github.com/Yolol100/Designchecker) inzetten. Het uiteindelijke Go/No-Go blijft bij de QA-owner.
+
 Generieke publieke read-only QA-evidencerunner voor Project Checklist. De `website-qa-checklist` Skill blijft QA-eigenaar; Google Drive blijft projectwaarheid; deze repository levert uitsluitend reproduceerbare evidence en manifesttransformatie.
 
 ## Repository hygiene
