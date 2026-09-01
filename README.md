@@ -34,3 +34,7 @@ Voor een formele evaluatie kan de controller het gevalideerde raw artifact op de
 ## Reproduceerbaarheid
 
 Node/toolversies, lockfile-installatie, vastgepinde externe Actions, netwerkguards, privacyredactie, evidence-contracten en de formele semantische validators blijven onderdeel van de generieke harness.
+
+## Licentie
+
+Deze repository bevat momenteel geen open-sourcelicentie. Hergebruik, distributie of afgeleide werken zijn niet toegestaan zonder expliciete toestemming van de rechthebbende.
