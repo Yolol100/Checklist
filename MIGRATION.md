@@ -2,7 +2,7 @@
 
 ## Status
 
-This repository remains the active legacy Website QA evidence runner until `Yolol100/Designchecker` proves full formal-evidence parity. It is maintenance-only for the Webactueel platform: preserve existing contracts and security, but add new generic browser/visual capabilities to Designchecker instead.
+The formal-evidence parity migration is complete and the `website-qa-checklist` owner accepted the controlled-runtime evidence route on 2026-09-15. `Yolol100/Designchecker` is now the active public, read-only Website QA evidence runner through the live `Yolol100/Orchestrator` adapter registry. This repository is **rollback-only**, not an active default runner. Preserve its frozen runner, safety guards, contracts, and rollback availability during the documented regression period. It is maintenance-only for the Webactueel platform: preserve existing contracts and security, but add new generic browser/visual capabilities to Designchecker instead.
 
 ## What must remain stable
 
@@ -32,16 +32,15 @@ This repository remains the active legacy Website QA evidence runner until `Yolo
 - a repository-owned Go/No-Go decision;
 - archive or adapter removal before parity and rollback proof.
 
-## Exit gates
+## Migration acceptance and remaining archive gates
 
-This repository may be retired only after:
+The frozen Checklist parityset, formal evidence semantics, request/run/artifact correlation, independent Website QA owner acceptance and the live controller adapter switch to `Yolol100/Designchecker` have been verified. This is **Source GO for the compatibility/evidence contract only**, not approval of any concrete website or release. See `Yolol100/Designchecker/docs/CHECKLIST-MIGRATION-EVIDENCE.md` for the exact acceptance receipt.
 
-1. the frozen Checklist parityset passes in Designchecker;
-2. formal evidence finalization is semantically equivalent;
-3. request/run/artifact correlation is verified;
-4. Website QA accepts the replacement output;
-5. the central adapterregistry is switched;
-6. a stable regression period completes;
-7. this repository remains available as rollback during that period.
+Before archiving this repository, verify all remaining gates:
 
-Until all gates are green, `NO_CHANGE` is correct and this runtime remains active.
+1. The central controller repository/package is synchronized and validated against the live Designchecker adapter route.
+2. No active controller callsite selects Checklist except for an explicit rollback.
+3. The regression window has completed with repeated parity and tested rollback availability.
+4. The central portfolio tracker records archive readiness and approval.
+
+Until then, keep this repository available for **explicit rollback only**; do not start new default runs, add features, or claim a website/release Go from repository results.
