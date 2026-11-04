@@ -20,11 +20,11 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Verify locked Lighthouse CI CLI
+      - name: Verify locked Lighthouse CLI
         shell: bash
         run: |
-          node -e "const cli=require('./node_modules/@lhci/cli/package.json'); if(cli.version !== '0.16.0') process.exit(1)"
-          npx --no-install lhci --version
+          node -e "const declared=require('./package.json').devDependencies.lighthouse; const locked=require('./package-lock.json').packages['node_modules/lighthouse'].version; const installed=require('./node_modules/lighthouse/package.json').version; if(declared !== '13.6.0' || declared !== locked || locked !== installed) process.exit(1)"
+          npx --no-install lighthouse --version
       - name: Syntax check
         run: npm run check
       - name: Adversarial unit and workflow tests
