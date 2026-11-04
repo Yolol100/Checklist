@@ -27,6 +27,17 @@ jobs:
               assert c.get(key) is False, f'{key} must be false'
           ids=[t['id'] for t in c['tools']]
           assert len(ids)==len(set(ids)), 'duplicate tool ids'
+          package=json.load(open('package.json', encoding='utf-8'))
+          expected_versions={
+              'playwright-chromium': package['dependencies']['playwright'],
+              'playwright-firefox': package['dependencies']['playwright'],
+              'playwright-webkit': package['dependencies']['playwright'],
+              'axe-core': package['dependencies']['axe-core'],
+              'lighthouse-cli': package['devDependencies']['lighthouse'],
+          }
+          for tool in c['tools']:
+              if tool['id'] in expected_versions:
+                  assert tool['version']==expected_versions[tool['id']], f"stale toolkit version: {tool['id']}"
           covered=set()
           for a in c['usage_assertions']:
               assert a['tool'] in ids
