@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node -e 'require("http").createServer((_request,response)=>{response.setHeader("Content-Type","text/html; charset=utf-8");response.end("<!doctype html><html lang=\\"en\\"><head><title>Local QA fixture</title></head><body><main><h1>Local QA fixture</h1></main></body></html>");}).listen(8765,"127.0.0.1")' &
+          node -e 'require("http").createServer((_request,response)=>{response.setHeader("Content-Type","text/html; charset=utf-8");response.end("<!doctype html><html lang=en><head><title>Local QA fixture</title></head><body><main><h1>Local QA fixture</h1></main></body></html>");}).listen(8765,"127.0.0.1")' &
           fixture_pid=$!
           trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
           for i in {1..25}; do
