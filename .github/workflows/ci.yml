@@ -33,7 +33,7 @@ jobs:
           for (const dependency of Object.keys(expected)) {
             const rows = matching.filter(([path]) => path.endsWith('/' + dependency));
             if (rows.length === 0 || rows.some(([,node]) => node.version !== expected[dependency])) throw Error('Unpatched dependency: ' + dependency);
-            if (require(dependency + '/package.json').version !== expected[dependency]) throw Error('Installed version mismatch: ' + dependency);
+            if (require('./node_modules/' + dependency + '/package.json').version !== expected[dependency]) throw Error('Installed version mismatch: ' + dependency);
           }
           console.log('Secure dependency graph: glob 14.0.3 + minimatch 11.0.4');
           NODE
