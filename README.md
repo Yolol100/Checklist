@@ -37,6 +37,10 @@ Ook via de actieve Designchecker-route blijft Website QA eigenaar van acceptatie
 
 `main` bevat alleen de generieke rollbackbron, contracten, validators en regressiefixtures die nog nodig zijn tijdens het regressievenster. Concrete targets, requests, policy-evaluaties en runresultaten horen niet als permanente operationele waarheid op `main`.
 
+## Beveiliging van bestaande rollback-afhankelijkheden
+
+De oude Lighthouse 13.6.0-runner blijft beschikbaar als rollbackbron. De npm-lock legt `glob 14.0.3` en `minimatch 11.0.4` vast via de root-`overrides` in `package.json`, zodat de bekende kwetsbare `minimatch 10.2.6` niet terugkomt. De bestaande CI controleert de exacte geïnstalleerde versies en voert de Lighthouse/Chromium-smoketest uit op een synthetische lokale pagina. Deze beveiligingsreparatie introduceert geen nieuwe Website-QA-route of productfunctionaliteit.
+
 ## Licentie
 
 Deze repository bevat momenteel geen open-sourcelicentie. Hergebruik, distributie of afgeleide werken zijn niet toegestaan zonder expliciete toestemming van de rechthebbende.

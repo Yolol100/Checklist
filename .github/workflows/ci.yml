@@ -20,6 +20,24 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Reject vulnerable glob or minimatch lock entries
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const p = require('./package.json');
+          const l = require('./package-lock.json');
+          if (p.overrides?.glob !== '14.0.3' || p.overrides?.minimatch !== '11.0.4') throw Error('Secure root overrides missing');
+          const expected = {glob:'14.0.3', minimatch:'11.0.4'};
+          const matching = Object.entries(l.packages || {}).filter(([path]) => /(?:^|\/)node_modules\/(glob|minimatch)$/.test(path));
+          for (const dependency of Object.keys(expected)) {
+            const rows = matching.filter(([path]) => path.endsWith('/' + dependency));
+            if (rows.length === 0 || rows.some(([,node]) => node.version !== expected[dependency])) throw Error('Unpatched dependency: ' + dependency);
+            if (require('./node_modules/' + dependency + '/package.json').version !== expected[dependency]) throw Error('Installed version mismatch: ' + dependency);
+          }
+          console.log('Secure dependency graph: glob 14.0.3 + minimatch 11.0.4');
+          NODE
+          npm ls glob minimatch lighthouse
       - name: Verify locked Lighthouse CLI
         shell: bash
         run: |
