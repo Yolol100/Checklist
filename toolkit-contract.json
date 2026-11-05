@@ -8,13 +8,13 @@
   "requires_api_key": false,
   "requires_mcp": false,
   "tools": [
-    {"id":"playwright-chromium","version":"1.62.0","trigger_when":"every browser-enabled QA run","outputs":["raw browser evidence"]},
-    {"id":"playwright-firefox","version":"1.62.0","trigger_when":"standard/full/release_verification","outputs":["supplemental cross-browser evidence"]},
-    {"id":"playwright-webkit","version":"1.62.0","trigger_when":"standard/full/release_verification","outputs":["supplemental cross-browser evidence"]},
-    {"id":"axe-core","version":"4.12.1","trigger_when":"primary Chromium browser evidence runs","outputs":["compact automated accessibility evidence"]},
+    {"id":"playwright-chromium","version":"1.64.1","trigger_when":"every browser-enabled QA run","outputs":["raw browser evidence"]},
+    {"id":"playwright-firefox","version":"1.64.1","trigger_when":"standard/full/release_verification","outputs":["supplemental cross-browser evidence"]},
+    {"id":"playwright-webkit","version":"1.64.1","trigger_when":"standard/full/release_verification","outputs":["supplemental cross-browser evidence"]},
+    {"id":"axe-core","version":"4.13.0","trigger_when":"primary Chromium browser evidence runs","outputs":["compact automated accessibility evidence"]},
     {"id":"bounded-link-scan","version":"repo","trigger_when":"full or release_verification","outputs":["EV-LINK-BOUNDED"]},
     {"id":"nu-html-checker","version":"asset-515207969","sha256":"c70279e260e5f4f9e95b3890ef6c9548f90ebdaec2a75219ec41694ab6241e34","trigger_when":"full or release_verification","outputs":["EV-HTML-VNU"]},
-    {"id":"lighthouse-ci","version":"0.15.1","trigger_when":"full or release_verification","outputs":["EV-LIGHTHOUSE-LAB"]}
+    {"id":"lighthouse-cli","version":"13.6.0","trigger_when":"full or release_verification","outputs":["EV-LIGHTHOUSE-LAB"]}
   ],
   "usage_assertions": [
     {"tool":"playwright-chromium","path":"src/browser.js","contains":"chromium"},
@@ -23,7 +23,7 @@
     {"tool":"axe-core","path":"src/browser.js","contains":"axeSource"},
     {"tool":"bounded-link-scan","path":"src/supplemental.js","contains":"boundedLinkScan"},
     {"tool":"nu-html-checker","path":".github/workflows/run-checklist.yml","contains":"VNU_ASSET_ID"},
-    {"tool":"lighthouse-ci","path":".github/workflows/run-checklist.yml","contains":"npx --no-install lhci collect"}
+    {"tool":"lighthouse-cli","path":".github/workflows/run-checklist.yml","contains":"npx --no-install lighthouse \"$TARGET_URL\""}
   ],
   "boundaries": [
     "Firefox/WebKit are Playwright synthetic evidence, not real device or branded Safari/iOS proof.",

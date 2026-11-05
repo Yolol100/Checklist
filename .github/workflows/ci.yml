@@ -20,12 +20,35 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify locked Lighthouse CLI
+        shell: bash
+        run: |
+          node -e "const declared=require('./package.json').devDependencies.lighthouse; const locked=require('./package-lock.json').packages['node_modules/lighthouse'].version; const installed=require('./node_modules/lighthouse/package.json').version; if(declared !== '13.6.0' || declared !== locked || locked !== installed) process.exit(1)"
+          npx --no-install lighthouse --version
       - name: Syntax check
         run: npm run check
       - name: Adversarial unit and workflow tests
         run: npm test
       - name: Install Chromium
         run: node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Verify Lighthouse JSON evidence on synthetic loopback page
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'require("http").createServer((_request,response)=>{response.setHeader("Content-Type","text/html; charset=utf-8");response.end("<!doctype html><html lang=en><head><title>Local QA fixture</title></head><body><main><h1>Local QA fixture</h1></main></body></html>");}).listen(8765,"127.0.0.1")' &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+          for i in {1..25}; do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:8765/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8765/ >/dev/null
+          export CHROME_PATH="$(node -e 'process.stdout.write(require("playwright").chromium.executablePath())')"
+          npx --no-install lighthouse http://127.0.0.1:8765/ \
+            --output=json --output-path=/tmp/checklist-lighthouse-ci-fixture.json \
+            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" --quiet
+          node -e 'const r=require("/tmp/checklist-lighthouse-ci-fixture.json");if(r.lighthouseVersion!=="13.6.0"||!r.categories||!r.audits||!r.finalUrl.startsWith("http://127.0.0.1:8765/"))process.exit(1)'
+
       - name: Smoke test raw evidence runner
         env:
           CHECKLIST_PERSIST_BROWSER_ARTIFACTS: "0"

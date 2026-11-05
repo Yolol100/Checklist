@@ -27,6 +27,17 @@ jobs:
               assert c.get(key) is False, f'{key} must be false'
           ids=[t['id'] for t in c['tools']]
           assert len(ids)==len(set(ids)), 'duplicate tool ids'
+          package=json.load(open('package.json', encoding='utf-8'))
+          expected_versions={
+              'playwright-chromium': package['dependencies']['playwright'],
+              'playwright-firefox': package['dependencies']['playwright'],
+              'playwright-webkit': package['dependencies']['playwright'],
+              'axe-core': package['dependencies']['axe-core'],
+              'lighthouse-cli': package['devDependencies']['lighthouse'],
+          }
+          for tool in c['tools']:
+              if tool['id'] in expected_versions:
+                  assert tool['version']==expected_versions[tool['id']], f"stale toolkit version: {tool['id']}"
           covered=set()
           for a in c['usage_assertions']:
               assert a['tool'] in ids
@@ -36,9 +47,9 @@ jobs:
           assert covered==set(ids), f'unwired tools: {set(ids)-covered}'
           workflow=pathlib.Path('.github/workflows/run-checklist.yml').read_text(encoding='utf-8')
           assert 'firefox webkit' in workflow
-          assert 'npx --no-install lhci collect' in workflow
+          assert 'npx --no-install lighthouse "$TARGET_URL"' in workflow
           assert 'VNU_SHA256' in workflow
-          assert 'lhci collect --url="$TARGET_URL" --numberOfRuns=1 --settings.chromeFlags="--no-sandbox"' in workflow
+          assert '--output-path=".lighthouseci/lhr-1.json"' in workflow
           assert 'PLAYWRIGHT_CHROMIUM_ARGS=--no-sandbox' not in workflow
           assert 'CHECKLIST_BROWSER_ARGS=--no-sandbox' not in workflow
           print('toolkit-contract: OK')

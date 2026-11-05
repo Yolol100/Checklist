@@ -103,7 +103,11 @@ jobs:
           TARGET_URL: ${{ steps.request.outputs.target_url }}
         run: |
           export CHROME_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")"
-          npx --no-install lhci collect --url="$TARGET_URL" --numberOfRuns=1 --settings.chromeFlags="--no-sandbox"
+          mkdir -p .lighthouseci
+          npx --no-install lighthouse "$TARGET_URL" \
+            --output=json --output-path=".lighthouseci/lhr-1.json" \
+            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" --quiet
+          node -e "const r=require('./.lighthouseci/lhr-1.json'); if (!r.categories || !r.audits || r.lighthouseVersion !== '13.6.0') process.exit(1)"
 
       - name: Merge supplemental evidence
         run: node src/append-supplemental.js "${{ steps.request.outputs.request_path }}"
