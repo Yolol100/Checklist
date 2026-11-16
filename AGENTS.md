@@ -2,14 +2,14 @@
 
 ## Platform status
 
-This repository is the active legacy Website QA evidence runner during the controlled migration to `Yolol100/Designchecker`. Read `MIGRATION.md` before changing behavior. Keep existing contracts working, but place new generic browser, accessibility, performance and visual capabilities in Designchecker.
+This repository is **rollback-only** after the accepted migration to `Yolol100/Designchecker`; it is **not an active or default Website QA runner**. Read `MIGRATION.md` before changing behavior. Preserve the frozen contracts only for an explicitly authorized rollback; put new generic browser, accessibility, performance and visual capabilities in Designchecker.
 
 ## Scope
 
 - Supply public read-only QA evidence for `website-qa-checklist`.
 - Never own severity, acceptance or final Go/No-Go.
 - Keep `webactueel-workflow` as controller for routing, sources, handoffs and closure.
-- Use Designchecker as the target consolidated runtime only after formal-evidence parity is proven.
+- Use `Yolol100/Designchecker` as the **active** consolidated runtime (controlled-runtime parity accepted on 2026-09-15). Select Checklist only for a documented, explicitly authorized rollback; it must not be restored as an ordinary controller route.
 
 ## Before changing files
 
